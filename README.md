@@ -6,6 +6,8 @@ At its base, this repository trains a transformer on a task of your choice, with
 
 It also lets you poke around GPT2-small as taken from huggingface, albeit only in a limited interface that is adapted to match the one for the models you will train here.
 
+### Notes
+
 For now, this repository is only concerned with the autoregressive language modeling objective - i.e., decoders, as opposed to encoders or encoder-decoders (think GPT models as opposed to BERT or T5). There is one model wrapper: the LM (language model), and one trainer: the LMTrainer. 
 
 This repository is missing many things: using more architectures (e.g. RNNs); training for objectives other than autoregressive language modeling; getting more pretrained models; getting attention from these pretrained models. Expansions are welcomed :)
@@ -14,7 +16,7 @@ This repository is missing many things: using more architectures (e.g. RNNs); tr
 
 In the Basics sections, you can follow along a minimal example with things already in this repository: in `Plain Run`, you can train a transformer, track its loss, and save it. In `Basics: Inspect Model`, load it (or GPT2-small if you prefer), and inspect your loaded model. In `Basics: Configs`, gain some control: change hyperparameters, give extra command line args, and run over multiple configurations.
 
-Once that's done, get into your logic! In `Custom Datasets` see how to define or add your own tasks, and in `Customising` see some examples of how to inject your logic into this code.
+Once that's done, get into your logic! In `Custom Datasets` see how to define or add your own tasks, and in `Customising` see some examples of how to inject your logic into this code. There's nothing too exciting in these examples, but they should give you a clear idea of where to go to insert your own more interesting modifications :)
 
 # Basics: Setup, and a Plain Train Run
 
