@@ -1,0 +1,18 @@
+DataParams
+
+dataset_name = "copy"
+debug_crop = 100
+
+TrainParams 
+
+epochs = 2
+no_wandb = False
+val_check_epoch_frac = 1.0
+
+ModelParams
+
+n_layers = 1
+n_heads = 1
+dim = 123
+tokenizer_source_name = "char"
+layer_architecture = ["torch-transformer", "custom-transformer"]

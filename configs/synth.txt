@@ -1,0 +1,21 @@
+DataParams
+
+TrainParams
+
+batch_size = 4
+accumulate_grad_batches = 8
+lr = 1e-3
+patience = 50
+scheduler_factor = 0.99
+warm_steps = 100
+epochs = 2
+
+
+ModelParams
+
+n_layers = 2
+n_heads = 2
+dim = 64
+max_seq_len = 200
+custom_tokenizer_ntokens = 2000
+tokenizer_source_name = "char" 

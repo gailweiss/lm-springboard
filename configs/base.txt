@@ -1,0 +1,17 @@
+DataParams
+
+TrainParams
+
+batch_size = 32
+lr = 1e-3
+warm_steps = 100
+epochs = 2
+max_sample_tokens = 50  
+
+ModelParams
+
+n_layers = 8
+n_heads = 8
+dim = [256,512]
+max_seq_len = 200
+tokenizer_source_name = "gpt2" 
