@@ -2,15 +2,15 @@
 
 This repository has all the boilerplate for making changes to the transformer architecture and training the modified model, so that you can dive directly into the logic of your idea. It allows evaluating the architectures on some natural and some synthetic tasks, as well as implementing or providing new tasks.
 
-At its base, this repository trains a transformer on a task of your choice, with the help of pytorch lightning, and tracks metrics with wandb. It surfaces all the relevant code so that you can go directly to defining or adding additional tasks, editing the transformer architecture or training behaviour, and comparing your modified methods to the originals. 
-
-It also lets you poke around GPT2-small as taken from huggingface, albeit only in a limited interface that is adapted to match the one for the models you will train here.
+At its base, this repository trains a transformer on a task of your choice, with the help of pytorch lightning, and tracks metrics with wandb. It surfaces all the relevant code so that you can go directly to defining or adding additional tasks, editing the transformer architecture or training behaviour, and comparing your modified methods to the originals. There's nothing special to any of the code here, but if you haven't already stuck it all together, this repository is all about skipping that step and going straight to your idea. (For me: it's the base repository from which I start every time I have a "what if the transformer architecture was actually..." idea).
 
 ### Notes
 
+This repository also lets you poke around GPT2-small as taken from huggingface, albeit only in a limited interface that is adapted to match the one for the models you will train here. If your main goal is to poke around open source pretrained models - and with a much richer interface than here - then you probably want Neel Nanda's TransformerLens instead: [https://github.com/neelnanda-io/TransformerLens].
+
 For now, this repository is only concerned with the autoregressive language modeling objective - i.e., decoders, as opposed to encoders or encoder-decoders (think GPT models as opposed to BERT or T5). There is one model wrapper: the LM (language model), and one trainer: the LMTrainer. 
 
-This repository is missing many things: using more architectures (e.g. RNNs); training for objectives other than autoregressive language modeling; getting more pretrained models; getting attention from these pretrained models. Expansions are welcomed :)
+This repository is missing many things: base implementations of more architectures (e.g. RNNs); training for objectives other than autoregressive language modeling; using beam search to sample from the models; getting more pretrained models; getting attention from these pretrained models; etc. Expansions are welcomed :)
 
 # Contents
 
@@ -34,7 +34,7 @@ For your first call, open the terminal and try:
 python3 main.py --config=test-nlp --task=ptb --no-wandb
 ```
 
-The code will very quickly train a tiny transformer - whose configuration is described in `configs/test-nlp.txt` - on the Penn Treebank. It will print samples at the end of every epoch (bad ones, as this is just a short dummy train).
+The code will very quickly train a tiny transformer - whose configuration is described in `configs/test-nlp.txt` - on the Penn Treebank. It will print samples at the end of every epoch (albeit bad ones, as this is just a short dummy train).
 
 ## Setup and Toggle WandB
 
@@ -120,6 +120,8 @@ Cons:
 Pros: 
 - Except for inspecting attention, which is not yet implemented, you can use this to interact with gpt2 through the same interface as provided for the models trained here.
 
+Overall, if you want to poke around open source pretrained models, you may prefer existing libraries for mechanistic interpretability - e.g. TransformerLens: [https://github.com/neelnanda-io/TransformerLens/]
+
 ## Inspect Model
 ### Generate
 
@@ -164,7 +166,7 @@ When applied to several sequences of different lengths, `per_token_res` is shape
 
 ### Inspect Attention
 
-Show the attention patterns of a transformer lm using the `model_explorer` function `show_lm_attns`. This function will work with the trainable transformers in this repository, if you add non-transformer layers however, you will have to edit the relevant logic in `model/transformer/transformer.py`. This function will not work on GPT2-small, but I will really appreciate someone adding that in. 
+Show the attention patterns of a transformer lm using the `model_explorer` function `show_lm_attns`. This function will work with the trainable transformers in this repository, if you add non-transformer layers however, you will have to edit the relevant logic in `model/transformer/transformer.py`. This function will not work on GPT2-small, but I will appreciate someone adding that in. 
 
 ```
 out_embeds, attns = model_explorer.show_lm_attns(lm,"as business managers know")
@@ -219,7 +221,7 @@ You can add a custom dataset from a file by placing it in a local data folder an
 
 ## Define Synthetic Dataset
 
-You can define a synthetic task by implementing and "registering" a function generating random samples for that task in `data/syntheticdata.py`. Decorate the function with `@registered` to register it, you will then be able to call that task by the name of this function. See e.g. `copy` and `histogram` in `data/syntheticdata.py` for examples.
+You can define a synthetic task by implementing and "registering" a function generating random samples for that task in `data/syntheticdata.py`. Decorate the function with `@registered` to register it, you will then be able to call that task by the name of this function. See e.g. `copy` and `histogram` in `data/syntheticdata.py` for examples. Note that, as implemented here, synthetic tasks only work with char-level tokenizers. You will have to explicitly change this behaviour if you want something else.
 
 # Customising
 
