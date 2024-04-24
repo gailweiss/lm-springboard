@@ -103,14 +103,19 @@ def _binsearch(val, lst):
 
 def pick_index_from_distribution(vector):  # all vector values must be >=0
     if isinstance(vector, torch.Tensor):
+        assert len(vector.shape) == 1
+        rel_indices = (vector > 0).nonzero().view(-1).tolist()
+        vector = vector[rel_indices]
         total = vector.sum()
         sums = torch.cumsum(vector, -1)
     else:
+        rel_indices = [i for i, v in enumerate(vector) if v > 0]
+        vector = [v[i] for i in rel_indices]
         total = np.sum(vector)
         sums = np.cumsum(vector)
     sums = sums.tolist()
     num = random.uniform(0, total)
-    return binsearch(num, sums)
+    return rel_indices[binsearch(num, sums)]
 
 
 # similar functions, using Path:

@@ -21,8 +21,12 @@ class LM(nn.Module):
         self.tested_manual_forward = False
         self.is_from_pretrained = False
 
-    def choose_output_index(self, e, temperature=0):
+    def choose_output_index(self, e, temperature=0, top_k=None):
         if temperature > 0:
+            if None is not top_k:
+                assert top_k > 0
+                c = torch.kthvalue(-e.view(-1), top_k).values
+                e = torch.where(e >= -c, e, -torch.inf)
             s = self.softmax(e / temperature)
             i = pick_index_from_distribution(s)
         else:
@@ -32,17 +36,7 @@ class LM(nn.Module):
     def device(self):
         return next(self.parameters()).device
 
-    @timed
-    def sample(self, pref="", max_seq_len=100, temperature=1, as_str=True):
-        if max_seq_len > self.model_params.max_seq_len:
-            print("model max sequence length is",
-                  f"{self.model_params.max_seq_len}, requested {max_seq_len}",
-                  f"-- cropping to maximum {self.model_params.max_seq_len}")
-            max_seq_len = self.model_params.max_seq_len
-        if isinstance(pref, str):
-            indices = self.tokenizer.tokenize_without_stop(pref)
-        else:
-            indices = pref
+    def _sample(self, indices, max_seq_len, temperature, top_k):
         eos = self.tokenizer.eos()
 
         def stop(indices):
@@ -58,8 +52,26 @@ class LM(nn.Module):
         while not stop(indices):
             e = self([indices])  # batch size X seq len X vocab size
             next_t = self.choose_output_index(e[0, -1, :],
-                                              temperature=temperature)
+                                              temperature=temperature,
+                                              top_k=top_k)
             indices.append(next_t)
+
+        return indices
+
+    @timed
+    def sample(self, pref="", max_seq_len=100, temperature=1, as_str=True,
+               top_k=None):
+        if max_seq_len > self.model_params.max_seq_len:
+            print("model max sequence length is",
+                  f"{self.model_params.max_seq_len}, requested {max_seq_len}",
+                  f"-- cropping to maximum {self.model_params.max_seq_len}")
+            max_seq_len = self.model_params.max_seq_len
+        if isinstance(pref, str):
+            indices = self.tokenizer.tokenize_without_stop(pref)
+        else:
+            indices = pref
+
+        indices = self._sample(indices, max_seq_len, temperature, top_k)
 
         if as_str:
             return self.tokenizer.convert_ids_to_nice_string(indices)
