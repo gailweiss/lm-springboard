@@ -56,7 +56,7 @@ class DataParams:
 #   fractions happens *before* the samples are broken into smaller chunks
 #   according to the model's maximum input length.
 # is_synthetic_task:
-#   Value for internal use: any value set here will be ignored and 
+#   Value for internal use: any value set here will be ignored and
 #   overwritten by get_data.
 
 
@@ -203,10 +203,13 @@ class LMDataModule(pl.LightningDataModule):
         # when running on my mac for too many epochs (batches dont bother it
         # - epochs do). i dont need this
 
+    def get_sample_str(self, i=0):
+        return self.tokenizer.convert_ids_to_nice_string(self.data[i])
+
     def show_sample(self, i=0):
         s = self.data[i]
         print(f"sample {i}, has {len(s)} tokens:")
-        print(self.tokenizer.convert_ids_to_nice_string(self.data[i]))
+        print(self.get_sample_str(i))
 
     def train_dataloader(self, batch_size):
         return self.generic_loader(self.train_samples, batch_size,
