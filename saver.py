@@ -48,7 +48,7 @@ def load_model(folder_name, full=False, verbose=True):
         tokenizer = None
 
     train_params.no_wandb = True  # no wandb in loaded models - or it will
-    # try (unsuccessfully) to send validation losses to wandb when doing a 
+    # try (unsuccessfully) to send validation losses to wandb when doing a
     # validation run
     lm, dataset = make_model_and_data(data_params, model_params, train_params,
                                       tokenizer=tokenizer, verbose=verbose)

@@ -143,9 +143,9 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
             im = ax.imshow(attns[layer][h])
             cbar = plt.colorbar(im)
             # cbar.ax.set_ylabel("sigmoid value", rotation=-90, va="bottom")
-            if isinstance(x,str):
+            if isinstance(x, str):
                 token_ids = lm.tokenizer(x)
-            else: # list or tensor - tokenizer can handle either
+            else:  # list or tensor - tokenizer can handle either
                 token_ids = x
             tokens = lm.tokenizer.convert_ids_to_tokens(token_ids)
             ax.set_xticks(range(len(token_ids)), labels=tokens)
