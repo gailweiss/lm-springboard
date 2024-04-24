@@ -17,26 +17,13 @@ class LM(nn.Module):
             positional_encoding_type=model_params.pos_encoding)
         self.de_embedder = nn.Linear(self.model_params.dim, self.n_tokens)
         self.tokenizer = tokenizer
-        self.softmax = nn.Softmax(dim=-1)
         self.tested_manual_forward = False
         self.is_from_pretrained = False
-
-    def choose_output_index(self, e, temperature=0, top_k=None):
-        if temperature > 0:
-            if None is not top_k:
-                assert top_k > 0
-                c = torch.kthvalue(-e.view(-1), top_k).values
-                e = torch.where(e >= -c, e, -torch.inf)
-            s = self.softmax(e / temperature)
-            i = pick_index_from_distribution(s)
-        else:
-            i = torch.argmax(e).item()
-        return i
 
     def device(self):
         return next(self.parameters()).device
 
-    def _sample(self, indices, max_seq_len, temperature, top_k):
+    def _sample(self, indices, max_seq_len, temperature, top_k, nucleus):
         eos = self.tokenizer.eos()
 
         def stop(indices):
@@ -51,16 +38,15 @@ class LM(nn.Module):
                 return True
         while not stop(indices):
             e = self([indices])  # batch size X seq len X vocab size
-            next_t = self.choose_output_index(e[0, -1, :],
-                                              temperature=temperature,
-                                              top_k=top_k)
+            next_t = choose_output_index(e[0, -1, :], temperature=temperature,
+                                         top_k=top_k, nucleus=nucleus)
             indices.append(next_t)
 
         return indices
 
     @timed
     def sample(self, pref="", max_seq_len=100, temperature=1, as_str=True,
-               top_k=None):
+               top_k=None, nucleus=None):
         if max_seq_len > self.model_params.max_seq_len:
             print("model max sequence length is",
                   f"{self.model_params.max_seq_len}, requested {max_seq_len}",
@@ -71,7 +57,8 @@ class LM(nn.Module):
         else:
             indices = pref
 
-        indices = self._sample(indices, max_seq_len, temperature, top_k)
+        indices = self._sample(indices, max_seq_len, temperature, top_k,
+                               nucleus)
 
         if as_str:
             return self.tokenizer.convert_ids_to_nice_string(indices)
@@ -198,3 +185,41 @@ class LM(nn.Module):
             raise Exception("lm of unknown type. from pretrained:",
                             self.is_from_pretrained)
         return (res, attns) if get_attns else res
+
+
+def choose_output_index(e, temperature=0, top_k=None, nucleus=None):
+    if temperature > 0:
+        e = filter_to_candidate_tokens(e, top_k, nucleus)
+        s = nn.Softmax(dim=-1)(e / temperature)
+        i = pick_index_from_distribution(s)
+    else:
+        i = torch.argmax(e).item()
+    return i
+
+
+def nucleus_threshold(vec, nucleus):
+    sorted_vals = torch.sort(vec, descending=True).values
+    increasing_sum = nn.Softmax(dim=-1)(sorted_vals).cumsum(dim=-1)
+    n = len(vec)
+    nucleus_start_point = torch.where(increasing_sum >= nucleus,
+                                      torch.arange(n), n).min().item()
+    nucleus_threshold = sorted_vals[nucleus_start_point]
+    num_chosen = torch.where(vec >= nucleus_threshold, 1, 0).sum().item()
+    chosen_ids = torch.where(vec >= nucleus_threshold, torch.arange(n), -1)
+    chosen_ids = torch.sort(chosen_ids, descending=True).values[:num_chosen]
+    return nucleus_threshold
+
+
+def filter_to_candidate_tokens(e, top_k, nucleus):
+    args = [top_k, nucleus]
+    assert args.count(None) >= len(args) - 1
+    if None is not top_k:
+        assert top_k > 0
+        thresh = -torch.kthvalue(-e.view(-1), top_k).values
+    if None is not nucleus:
+        thresh = nucleus_threshold(e, nucleus)
+    e = torch.where(e >= thresh, e, -torch.inf)
+    num_chosen = torch.where(e > -torch.inf, 1, 0).sum().item()
+    chosen_ids = torch.where(e > -torch.inf, torch.arange(len(e)), -1)
+    chosen_ids = torch.sort(chosen_ids, descending=True).values[:num_chosen]
+    return e
