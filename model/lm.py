@@ -212,6 +212,8 @@ def nucleus_threshold(vec, nucleus):
 
 def filter_to_candidate_tokens(e, top_k, nucleus):
     args = [top_k, nucleus]
+    if args.count(None) == len(args):
+        return e
     assert args.count(None) >= len(args) - 1
     if None is not top_k:
         assert top_k > 0
@@ -219,7 +221,4 @@ def filter_to_candidate_tokens(e, top_k, nucleus):
     if None is not nucleus:
         thresh = nucleus_threshold(e, nucleus)
     e = torch.where(e >= thresh, e, -torch.inf)
-    num_chosen = torch.where(e > -torch.inf, 1, 0).sum().item()
-    chosen_ids = torch.where(e > -torch.inf, torch.arange(len(e)), -1)
-    chosen_ids = torch.sort(chosen_ids, descending=True).values[:num_chosen]
     return e
