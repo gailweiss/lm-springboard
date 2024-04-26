@@ -149,7 +149,7 @@ class LM(nn.Module):
                                       ignore_index=self.ignore_index)
         losses = loss_fn(z.view(-1, self.n_tokens),
                          y.reshape(-1)).view(y.shape)
-        losses = losses["main"].detach()
+        losses = losses.detach()
         res = losses if before_exp else torch.exp(losses)  # perplexity: e^loss
 
         mask = batch["mask"]

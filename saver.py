@@ -20,7 +20,7 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
             json.dump(vars(p), f)
     with open(path_join(folder_name, "train_stats.json"), "w") as f:
         json.dump(my_trainer.logged_stats_dict, f)
-    pl_trainer.model.lm.tokenizer.save(folder_name)
+    pl_trainer.model.model.tokenizer.save(folder_name)
     pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
 
 
@@ -55,9 +55,9 @@ def load_model(folder_name, full=False, verbose=True):
 
     model_trainer = Trainer.load_from_checkpoint(
                                 path_join(folder_name, "model.model"),
-                                lm=lm, train_params=train_params)
+                                model=lm, train_params=train_params)
 
-    lm = model_trainer.lm
+    lm = model_trainer.model
     lm.eval()  # return with training off, im basically never trying to retrain
     # a loaded model, at least for now
     if full:
