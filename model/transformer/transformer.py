@@ -38,7 +38,7 @@ class Transformer(nn.Module):
             )
         return res
 
-    def forward(self, x, get_attns=False, attn_requests=None, 
+    def forward(self, x, get_attns=False, attn_requests=None,
                 embeddings_list=None):
         # batch size X seq len X embed dim
         mask = self.causal_mask(x.shape[1], x.device, x.dtype)

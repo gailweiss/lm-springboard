@@ -26,7 +26,7 @@ class LoralizedModule(nn.Module):
         self.orig_weight = None
         self.orig_bias = None
         super().__init__()
-    
+
     def set_internal_freezes(self):
         self.orig_weight.requires_grad_(False)
         if self.orig_bias is not None:
@@ -37,13 +37,13 @@ class LoralizedLayerNorm(LoralizedModule):
     def __init__(self, ln):
         super().__init__()
         self.ln = ln
-        self.orig_weight = self.ln.weight 
+        self.orig_weight = self.ln.weight
         self.orig_bias = self.ln.bias
         self.aw = get_adaptor(self.orig_weight, None)
         self.ab = get_adaptor(self.orig_bias, None)
         self.set_internal_freezes()
 
-    def forward(self,x):
+    def forward(self, x):
         weight = self.orig_weight + self.aw
         bias = self.orig_bias + self.ab
         return F.layer_norm(x, self.ln.normalized_shape, weight, bias,
@@ -53,10 +53,10 @@ class LoralizedLayerNorm(LoralizedModule):
 # adapted from implementation here:
 # https://huggingface.co/transformers/v3.1.0/_modules/transformers/
 # modeling_utils.html#Conv1D
-class LoralizedConv1D(LoralizedModule): 
+class LoralizedConv1D(LoralizedModule):
     def __init__(self, c, lora_rank):
         super().__init__()
-        self.orig_weight = c.weight 
+        self.orig_weight = c.weight
         self.orig_bias = c.bias
         self.nf = c.nf
         self.aw1, self.aw2 = get_adaptor(self.orig_weight, lora_rank)
@@ -73,15 +73,15 @@ class LoralizedConv1D(LoralizedModule):
 
 
 class LoralizedLinear(LoralizedModule):
-    def __init__(self, l, lora_rank):
+    def __init__(self, linear, lora_rank):
         super().__init__()
-        self.orig_weight = l.weight
-        self.orig_bias = l.bias  # might be None
+        self.orig_weight = linear.weight
+        self.orig_bias = linear.bias  # might be None
         self.aw1, self.aw2 = get_adaptor(self.orig_weight, lora_rank)
 
         if None is not self.orig_bias:
             self.ab = get_adaptor(self.orig_bias, lora_rank)
-            
+
         self.set_internal_freezes()
 
     def forward(self, x):
@@ -100,24 +100,24 @@ class LoralizedEmbedding(LoralizedModule):
         super().__init__()
         self.e = e
         self.orig_weight = e.weight
-        self.aw1, self.aw2 =  get_adaptor(self.e.weight, lora_rank)
+        self.aw1, self.aw2 = get_adaptor(self.e.weight, lora_rank)
         self.set_internal_freezes()
 
     def forward(self, x):
         weight = self.orig_weight + (self.aw1 @ self.aw2)
         return F.embedding(x, weight, self.e.padding_idx, self.e.max_norm,
-                           self.e.norm_type, self.e.scale_grad_by_freq, 
+                           self.e.norm_type, self.e.scale_grad_by_freq,
                            self.e.sparse)
 
 
 def loralize_gpt2lmheadmodel(model, lora_rank):
-    def loralize_gpt2block(l):
-        l.ln_1 = LoralizedLayerNorm(l.ln_1)
-        l.attn.c_attn = LoralizedConv1D(l.attn.c_attn, lora_rank)
-        l.attn.c_proj = LoralizedConv1D(l.attn.c_proj, lora_rank)
-        l.ln_2 = LoralizedLayerNorm(l.ln_2)
-        l.mlp.c_fc = LoralizedConv1D(l.mlp.c_fc, lora_rank)
-        l.mlp.c_proj = LoralizedConv1D(l.mlp.c_proj, lora_rank)
+    def loralize_gpt2block(layer):
+        layer.ln_1 = LoralizedLayerNorm(layer.ln_1)
+        layer.attn.c_attn = LoralizedConv1D(layer.attn.c_attn, lora_rank)
+        layer.attn.c_proj = LoralizedConv1D(layer.attn.c_proj, lora_rank)
+        layer.ln_2 = LoralizedLayerNorm(layer.ln_2)
+        layer.mlp.c_fc = LoralizedConv1D(layer.mlp.c_fc, lora_rank)
+        layer.mlp.c_proj = LoralizedConv1D(layer.mlp.c_proj, lora_rank)
 
     model.transformer.wte = LoralizedEmbedding(model.transformer.wte,
                                                lora_rank)
@@ -125,8 +125,8 @@ def loralize_gpt2lmheadmodel(model, lora_rank):
                                                lora_rank)
     model.transformer.ln_f = LoralizedLayerNorm(model.transformer.ln_f)
     model.lm_head = LoralizedLinear(model.lm_head, lora_rank)
-    for l in model.transformer.h:
-        loralize_gpt2block(l)
+    for layer in model.transformer.h:
+        loralize_gpt2block(layer)
     model.loralized = True
 
 
@@ -136,7 +136,7 @@ class LoralizedGPT2LMHeadModel(LoralizedModule):
         self.source_model = model
         self.lora_rank = lora_rank
         self.setup()
-        self.n_tokens = self.source_model.n_tokens 
+        self.n_tokens = self.source_model.n_tokens
         # my code uses this somewhere
 
     def set_internal_freezes(self):
@@ -149,9 +149,9 @@ class LoralizedGPT2LMHeadModel(LoralizedModule):
 
     def setup(self):
         assert not hasattr(self.source_model, "loralized")
-        # messy: modifying GPT2LMHeadModel in-place 
+        # messy: modifying GPT2LMHeadModel in-place
         # because idk what order they run all the parts in
-        loralize_gpt2lmheadmodel(self.source_model, self.lora_rank) 
+        loralize_gpt2lmheadmodel(self.source_model, self.lora_rank)
         self.set_internal_freezes()
 
     def forward(self, *args, **kwargs):

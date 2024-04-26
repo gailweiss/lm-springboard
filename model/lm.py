@@ -7,7 +7,8 @@ from tqdm import tqdm
 
 
 class LM(nn.Module):
-    def __init__(self, tokenizer, model, model_params, is_from_pretrained=False):
+    def __init__(self, tokenizer, model, model_params,
+                 is_from_pretrained=False):
         super().__init__()
         self.is_from_pretrained = is_from_pretrained
         self.model_params = model_params
@@ -173,7 +174,7 @@ class LM(nn.Module):
                      num_unmasked, mask)
         # res contains 0 where masked, as useful dummy value for means
 
-    def forward(self, x, get_attns=False, attn_requests=None, 
+    def forward(self, x, get_attns=False, attn_requests=None,
                 get_embeddings=False):
         # x shape: should be batch size x seq len, possibly padded.
         # but can be: just seq len (in which case will be reshaped to batch
@@ -190,26 +191,26 @@ class LM(nn.Module):
               f"max len: {self.model_params.max_seq_len}"
         assert cond, msg
         if not self.is_from_pretrained:
-            e0 = self.embed(x) # batch size X seq len X embedding dim
+            e0 = self.embed(x)  # batch size X seq len X embedding dim
             embeddings_list = [e0] if get_embeddings else None
             eL, attns = self.decoder(e0, get_attns=get_attns,
                                      attn_requests=attn_requests,
                                      embeddings_list=embeddings_list)
             logits = self.de_embedder(eL)
         elif self.is_from_pretrained == "gpt2":
-            r = self.decoder(x, output_attentions=get_attns, 
+            r = self.decoder(x, output_attentions=get_attns,
                              output_hidden_states=get_embeddings)
             logits = r.logits
             attns = torch.stack(r.attentions).transpose(0, 1) if get_attns\
-                    else None
+                else None
             embeddings_list = r.hidden_states  # actually tuple but good enough
         else:
             raise Exception("lm of unknown type. from pretrained:",
                             self.is_from_pretrained)
-        
+
         embeddings = torch.stack(embeddings_list).transpose(0, 1) if\
-                     get_embeddings else None
-        # embeddings shape: 
+            get_embeddings else None
+        # embeddings shape:
         # batch size X n layers + 1 X seq len X embedding dim
         # (n layers + 1 because input embeddings)
         # logits shape:

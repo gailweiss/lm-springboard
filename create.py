@@ -8,6 +8,7 @@ from gpt2 import get_gpt2
 from model.loralizer import add_lora
 import dataclasses
 
+
 def make_tokenizer_and_data(data_params, model_params, train_params,
                             existing_tokenizer=None, verbose=True):
     # the data makes the tokenizer, which in turn is important for the model,
@@ -49,18 +50,18 @@ def make_tokenizer_and_data(data_params, model_params, train_params,
     return tokenizer, dataset
 
 
-def sync_model_params(requested_model_params,lora_gpt2_model_params):
+def sync_model_params(requested_model_params, lora_gpt2_model_params):
     # the only factors that the outside request actually influences
     # in creation of the model:
     lora_gpt2_model_params.layer_architecture = \
-        requested_model_params.layer_architecture # hf-gpt2-lora
+        requested_model_params.layer_architecture  # hf-gpt2-lora
     lora_gpt2_model_params.lora_rank = requested_model_params.lora_rank
     if requested_model_params.max_seq_len > 0:
         lora_gpt2_model_params.max_seq_len = requested_model_params.max_seq_len
 
     # now the rest of the factors are from loading gpt2, so write them back:
-    for a,v in dataclasses.asdict(lora_gpt2_model_params).items():
-        setattr(requested_model_params,a,v)
+    for a, v in dataclasses.asdict(lora_gpt2_model_params).items():
+        setattr(requested_model_params, a, v)
 
 
 def make_model_and_data(data_params, model_params, train_params,
@@ -69,14 +70,14 @@ def make_model_and_data(data_params, model_params, train_params,
         lm_gpt2 = get_gpt2()
         assert None is tokenizer
         tokenizer = lm_gpt2.tokenizer
-        sync_model_params(model_params,lm_gpt2.model_params)
+        sync_model_params(model_params, lm_gpt2.model_params)
 
     tokenizer, dataset = make_tokenizer_and_data(data_params,
                                                  model_params,
                                                  train_params,
                                                  existing_tokenizer=tokenizer,
                                                  verbose=verbose)
-    
+
     if model_params.layer_architecture == "hf-gpt2-lora":
         lm = lm_gpt2
         lm.decoder = add_lora(lm.decoder, model_params.lora_rank)

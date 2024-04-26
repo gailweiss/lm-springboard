@@ -36,7 +36,7 @@ class ModelParams:
 #   the feedforward layers will have hidden dimension 512.
 # max_seq_len:
 #   Maximum input length the transformer can take, in number of tokens. If
-#   fine tuning will set to 
+#   fine tuning will set to:
 #       min(max_seq_len, Mp) if max_seq_len <= 0 else Mp
 #   where Mp is the max_seq_len of the pretrained model being finetuned.
 # tokenizer_source_name:
