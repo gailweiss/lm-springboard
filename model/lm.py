@@ -7,18 +7,19 @@ from tqdm import tqdm
 
 
 class LM(nn.Module):
-    def __init__(self, tokenizer, model, model_params):
+    def __init__(self, tokenizer, model, model_params, is_from_pretrained=False):
         super().__init__()
+        self.is_from_pretrained = is_from_pretrained
         self.model_params = model_params
         self.decoder = model
         self.n_tokens = tokenizer.vocab_size()
-        self.embed = FullEmbedding(
-            model_params.dim, self.n_tokens, model_params.max_seq_len,
-            positional_encoding_type=model_params.pos_encoding)
-        self.de_embedder = nn.Linear(self.model_params.dim, self.n_tokens)
+        if not self.is_from_pretrained:
+            self.embed = FullEmbedding(
+                model_params.dim, self.n_tokens, model_params.max_seq_len,
+                positional_encoding_type=model_params.pos_encoding)
+            self.de_embedder = nn.Linear(self.model_params.dim, self.n_tokens)
         self.tokenizer = tokenizer
         self.tested_manual_forward = False
-        self.is_from_pretrained = False
         self.ignore_index = self.tokenizer.pad_token_id
         self.celoss = nn.CrossEntropyLoss(ignore_index=self.ignore_index)
 

@@ -9,17 +9,25 @@ def get_gpt2():
     # nothing to do with all the training stuff i have -
     # just some gpt2 poking. nice to have this in the base repository too
     model_params = ModelParams()
+    gpt2 = AutoModelForCausalLM.from_pretrained("gpt2")
+
+    # my code uses these
+    gpt2.n_tokens = gpt2.transformer.wte.weight.shape[0]
+    model_params.max_seq_len = gpt2.transformer.wpe.weight.shape[0]
     model_params.layer_architecture = "gpt2-transformer"
 
-    transformer = AutoModelForCausalLM.from_pretrained("gpt2")
-
-    # maximum length it can take
-    model_params.max_seq_len = transformer.transformer.wpe.weight.shape[0]
-
-    # my code uses this attribute
-    transformer.n_tokens = transformer.transformer.wte.weight.shape[0]
+    # noting other attributes in model_params for completeness and potential
+    # future use
+    model_params.n_layers = len(gpt2.transformer.h)
+    model_params.n_heads = gpt2.transformer.h[0].attn.num_heads
+    model_params.dim = gpt2.lm_head.in_features
+    hidden_dim = gpt2.transformer.h[0].mlp.c_fc.weight.shape[1]
+    model_params.dim_ff_factor = hidden_dim // model_params.dim
+    assert model_params.dim_ff_factor * model_params.dim == hidden_dim
+    model_params.tokenizer_source_name = "gpt2"
+    model_params.pos_encoding = "gpt2"
+    model_params.individual_head_params = False
 
     tokenizer = MyTokenizer(data=None, name="gpt2", no_crop=True)
-    lm = LM(tokenizer, transformer, model_params)
-    lm.is_from_pretrained = "gpt2"
+    lm = LM(tokenizer, gpt2, model_params, is_from_pretrained="gpt2")
     return lm
