@@ -4,16 +4,14 @@ import wandb
 from time import process_time
 
 
-class LMTrainer(pl.LightningModule):
-    def __init__(self, lm, train_params, start_time=None,
+class Trainer(pl.LightningModule):
+    def __init__(self, model, train_params, start_time=None,
                  samples_at_validation=True):
         super().__init__()
-        self.lm = lm
+        self.model = model
         self.train_params = train_params
-        self.ignore_index = self.lm.tokenizer.pad_token_id
-        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.ignore_index)
-        self.curr_val_losses = []
-        self.curr_train_losses = []
+        self.curr_train_losses_by_type = {}
+        self.curr_val_losses_by_type = {}
         self.curr_steps_count = 0
         self.this_lm_total_batches = 0
         self.start_time = start_time  # should be obtained with process_time()
@@ -22,7 +20,7 @@ class LMTrainer(pl.LightningModule):
         self.logged_stats_dict = {}
         self.samples_at_validation = samples_at_validation
         # allows turning sampling off in specific cases,
-        # in particular when making lmtrainers for quick validation checks
+        # in particular when making trainers for quick validation checks
         # through model_explorer.py
         self.last_val_loss = None
         # for reading the val loss after initiating a validation check with
@@ -57,20 +55,23 @@ class LMTrainer(pl.LightningModule):
             self.log_stat("process_time", process_time() - self.start_time)
 
     def on_train_epoch_end(self):
-        self.log_stat("train_loss", (sum(self.curr_train_losses) /
-                                     len(self.curr_train_losses)))
         self.log_time()
-        self.curr_train_losses = []
+        for t, losses in self.curr_train_losses_by_type.items():
+            self.log_stat(f"train_loss:{t}", sum(losses) / len(losses))
+        self.curr_train_losses_by_type = {}
 
     def on_validation_epoch_end(self):
-        val_loss = sum(self.curr_val_losses) / len(self.curr_val_losses)
-        self.log_stat("validation_loss", val_loss)
         self.log_time()
+        for t, losses in self.curr_val_losses_by_type.items():
+            self.log_stat(f"val_loss:{t}", sum(losses) / len(losses))
+        main = self.curr_val_losses_by_type["main"]
+        self.curr_val_losses_by_type = {}
+
+        val_loss = sum(main) / len(main)
         self.last_val_loss = val_loss  # might want this e.g. in model_explorer
-        self.curr_val_losses = []
         if self.samples_at_validation:
             print("====\ncurrent val loss:", val_loss, ", sampling: ====")
-            sample = self.lm.sample(
+            sample = self.model.sample(
                         max_seq_len=self.train_params.max_sample_tokens,
                         temperature=self.train_params.sample_temperature)
             # linux doesnt always like printing the samples if they have funny
@@ -82,20 +83,20 @@ class LMTrainer(pl.LightningModule):
                 print(e)
             print("\n")
 
-    def get_loss(self, batch, from_train=False):
-        indices, mask = batch["x_indices"], batch["mask"]
-        if mask is not None:
-            indices = indices + (mask*self.lm.tokenizer.pad_token_id)
-        x = indices[:, :-1]
-        y = indices[:, 1:]  # -> y not contiguous
-        # -> y.view(-1) won't work, need reshape instead
-        y = y.to(dtype=torch.long)  # cross entropy loss expects target to have
-        # type 'long' and will crash without explanation otherwise, so lets
-        # just be safe
-        z = self.lm(x)
+    def record_type_losses(self, losses, recording_dict, from_train=False):
+        # dont want to record losses with their graphs or anything
+        def item(loss):
+            if isinstance(loss, torch.Tensor):
+                return loss.item()
+
+        for t in losses:
+            if t not in recording_dict:
+                recording_dict[t] = [item(losses[t])]
+            else:
+                recording_dict[t].append(item(losses[t]))
         if from_train:
-            self.n_train_samples += x.shape[0]
-        return self.loss(z.view(-1, self.lm.n_tokens), y.reshape(-1))
+            for t in losses:
+                self.log_stat(f"train_batch_loss:{t}", item(losses[t]))
 
     def curr_avg_lr(self):
         lrs = [pg['lr'] for pg in self.lr_schedulers().optimizer.param_groups]
@@ -103,7 +104,7 @@ class LMTrainer(pl.LightningModule):
 
     def log_hyperparams_and_time(self):
         n_active_params = sum(p.numel() for p in
-                              self.lm.parameters() if p.requires_grad)
+                              self.model.parameters() if p.requires_grad)
         self.log_stat("n_active_params", n_active_params)
         self.log_time()
 
@@ -116,18 +117,20 @@ class LMTrainer(pl.LightningModule):
         # not actually a "training_step" rather, a step in the computation
         # of the loss for the optimizer step (which may be only every x
         # train_steps, specifically x=accumulate_grad_batches)
-        loss = self.get_loss(batch, from_train=True)
-        self.log("train_batch_loss", loss.item())  # for the lr scheduler
-        self.curr_train_losses.append(loss.item())
-        self.log_stat("train_batch_loss", loss.item())
+        losses, n_samples = self.model.get_losses(batch)
+        self.n_train_samples += n_samples
+        self.record_type_losses(losses, self.curr_train_losses_by_type,
+                                from_train=True)
+        main_loss = losses["main"]
+        self.log("train_batch_loss", main_loss.item())  # for the lr scheduler
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
-        return loss
+        return main_loss
 
     def validation_step(self, batch, batch_idx):
-        loss = self.get_loss(batch)
-        self.curr_val_losses.append(loss.item())
-        return loss.item()
+        losses, n_samples = self.model.get_losses(batch)
+        self.record_type_losses(losses, self.curr_val_losses_by_type)
+        return losses["main"].item()
 
     def make_main_scheduler(self, optimizer):
         if self.train_params.scheduler_type == 'Plateau':

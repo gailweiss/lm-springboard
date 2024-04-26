@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import saver
 import glob
 import lightning as pl
-from model.lmtrainer import LMTrainer
+from train.trainer import Trainer
 import torch
 from util import prepare_directory
 
@@ -104,7 +104,7 @@ def compute_validation(lm, dataset, params, sample=True):
     pltrainer = pl.Trainer(enable_checkpointing=False, logger=False,
                            devices=1, max_epochs=1)
     tp = params["train_params"]
-    mytrainer = LMTrainer(lm, tp, samples_at_validation=sample)
+    mytrainer = Trainer(lm, tp, samples_at_validation=sample)
     pltrainer.validate(mytrainer,
                        dataloaders=dataset.val_dataloader(tp.batch_size))
     if not was_training:

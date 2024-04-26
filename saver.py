@@ -3,9 +3,9 @@ from util import prepare_directory
 from pathlib import Path
 from os.path import join as path_join
 from create import make_model_and_data
-from model.lmtrainer import LMTrainer
+from train.trainer import Trainer
+from train.train_params import TrainParams
 from model.model_params import ModelParams
-from model.train_params import TrainParams
 from data.dataloader import DataParams
 from model.tokenizer import MyTokenizer
 
@@ -53,7 +53,7 @@ def load_model(folder_name, full=False, verbose=True):
     lm, dataset = make_model_and_data(data_params, model_params, train_params,
                                       tokenizer=tokenizer, verbose=verbose)
 
-    model_trainer = LMTrainer.load_from_checkpoint(
+    model_trainer = Trainer.load_from_checkpoint(
                                 path_join(folder_name, "model.model"),
                                 lm=lm, train_params=train_params)
 

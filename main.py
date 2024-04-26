@@ -3,8 +3,8 @@ import torch.nn as nn
 from data.dataloader import DataParams
 from model.model_params import ModelParams
 from model.lm import LM
-from model.lmtrainer import LMTrainer
-from model.train_params import TrainParams
+from train.trainer import Trainer
+from train.train_params import TrainParams
 import lightning as pl
 import argparse
 from dataclasses import asdict
@@ -133,7 +133,7 @@ def train(args, lm, dataset, tp):
         max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac,
         gradient_clip_val=tp.gradient_clip_val)
 
-    mytrainer = LMTrainer(lm, tp, start_time=start_time)
+    mytrainer = Trainer(lm, tp, start_time=start_time)
 
     if args.return_things:
         raise DebugException(lm=lm, pltrainer=pltrainer, dataset=dataset,

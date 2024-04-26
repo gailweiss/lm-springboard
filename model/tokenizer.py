@@ -157,7 +157,7 @@ class MyTokenizer:
             self.tokenizer.add_tokens(["\n"])
             self._crop_from(data)
             self.pad_token_id = self.tokenizer._pad_token_type_id
-            # the lmtrainer needs this (the ignored value) for the cross
+            # the trainer needs this (the ignored value) for the cross
             # entropy calculation
         else:
             print("\n\n!!unrecognised tokenizer name!:", self.name)

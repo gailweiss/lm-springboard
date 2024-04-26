@@ -19,6 +19,8 @@ class LM(nn.Module):
         self.tokenizer = tokenizer
         self.tested_manual_forward = False
         self.is_from_pretrained = False
+        self.ignore_index = self.tokenizer.pad_token_id
+        self.celoss = nn.CrossEntropyLoss(ignore_index=self.ignore_index)
 
     def device(self):
         return next(self.parameters()).device
@@ -120,21 +122,36 @@ class LM(nn.Module):
             per_token_res = cat_with_dim1_pad(per_token_res)
         return mean_l, max_l, min_l, total_tokens, per_token_res
 
-    def batch_perplexities(self, batch, before_exp=False):
+    def get_batch_xyz(self, batch, loss_requests=None):
         indices, mask = batch["x_indices"], batch["mask"]
         if mask is not None:
-            indices = indices + (mask * self.tokenizer.pad_token_id)
+            indices = indices + (mask * self.ignore_index)
         x = indices[:, :-1]
-        y = indices[:, 1:]  # -> y not contiguous -> y.view(-1) won't work
-        # (i.e. need reshape instead of view)
-        y = y.to(dtype=torch.long)  # cross entropy loss expects target to be
-        # 'long' and will crash without explanation otherwise, so play safe
-        z = self(x).detach()  # dont need to grad through these
+        y = indices[:, 1:]  # -> y not contiguous
+        # -> y.view(-1) won't work, need reshape instead
+        y = y.to(dtype=torch.long)  # cross entropy loss expects target to have
+        # type 'long' and will crash without explanation otherwise, so lets
+        # just be safe
+        z = self(x)
+        return x, y, z
+
+    def get_losses(self, batch, loss_requests=None):
+        x, y, z = self.get_batch_xyz(batch, loss_requests=loss_requests)
+        main_loss = self.celoss(z.view(-1, self.n_tokens), y.reshape(-1))
+        losses = {"main": main_loss}
+        return losses, x.shape[0]  # num samples
+
+    def batch_perplexities(self, batch, before_exp=False):
+        x, y, z = self.get_batch_xyz(batch)
+        z = z.detach()
         loss_fn = nn.CrossEntropyLoss(reduction="none",
-                                      ignore_index=self.tokenizer.pad_token_id)
+                                      ignore_index=self.ignore_index)
         losses = loss_fn(z.view(-1, self.n_tokens),
                          y.reshape(-1)).view(y.shape)
+        losses = losses["main"].detach()
         res = losses if before_exp else torch.exp(losses)  # perplexity: e^loss
+
+        mask = batch["mask"]
         if None is not mask:
             mask = mask[:, 1:]
             mm = mask.reshape(-1)

@@ -2,7 +2,7 @@ from data.dataloader import get_data, LMDataModule, DataParams
 from model.tokenizer import MyTokenizer
 from model.transformer.transformer import Transformer
 from model.model_params import ModelParams
-from model.train_params import TrainParams
+from train.train_params import TrainParams
 from model.lm import LM
 
 

@@ -336,18 +336,18 @@ Maybe you also have ideas for changes to the train loop, or additional metrics y
 
 Let's freeze random layers at every train batch. Note: I am not sure how this will interact if stepping on multiple batches at a time, so set `accumulate_grad_batches=1` in the TrainParams for this one (this parameter is described in `model/train_params.py`).
 
-1. Open `model/train_params.py` and add an argument `freeze_random_layers: bool = False`.
-2. Open `model/lmtrainer.py` and go to the function `get_loss`. Just before the line
+1. Open `train/train_params.py` and add an argument `freeze_random_layers: bool = False`.
+2. Open `train/trainer.py` and go to the function `training_step`. Just before the line
 
 ```
-z = self.lm(x)
+losses, n_samples = self.model.get_losses(batch)
 ```
 
 insert the lines:
 
 ```
 if self.train_params.freeze_random_layers:
-	for layer in self.lm.decoder.layers:
+	for layer in self.model.decoder.layers:
 		layer.requires_grad_((torch.randint(2,(1,)).item() == 1))
 ```
 This will freeze a random subset of the layers.
@@ -356,36 +356,49 @@ This will freeze a random subset of the layers.
 
 ### Example: Corrupting Input (but not Target) During Training
 
-1. Open `model/train_params.py` and add an argument `corruption_frac: float = 0.0`.
-2. Open `model/lmtrainer.py` and again go to the function `get_loss`. Just before the line 
+1. Open `train/train_params.py` and add an argument `corruption_frac: float = 0.0`.
+2. Open `train/trainer.py` and go to the function `training_step`. Define a local (nested) function:
+
 ```
-z = self.lm(x)
+	def apply_corruption(x):
+		bsz,seq_len = x.shape
+		dropout = torch.nn.Dropout(self.train_params.corruption_frac)
+		rand_replacement = torch.randint(0,self.model.n_tokens,x.shape).to(device=x.device)
+		corr_locs = (dropout(torch.ones(x.shape))==0).to(device=x.device)
+		return torch.where(corr_locs,rand_replacement,x)
+```
+
+and replace the line
+
+```
+losses, n_samples = self.model.get_losses(batch, self.train_params)
+```
+
+with 
+
+```
+losses, n_samples = self.model.get_losses(batch, self.train_params, loss_requests=apply_corruption)
+```
+
+2. Open `model/lm.py` and go to the function `get_batch_xyz`. Just before the line 
+
+```
+z = self(x)
 ```
 
 insert the lines
 ```
-if from_train and self.train_params.corruption_frac > 0:
-	x = self.apply_corruption(x)
-```
-
-Then add a function `apply_corruption` to the `LMTrainer` class as follows:
-```
-	def apply_corruption(self,x):
-		bsz,seq_len = x.shape
-		dropout = torch.nn.Dropout(self.train_params.corruption_frac)
-		rand_replacement = torch.randint(0,self.lm.n_tokens,x.shape).to(device=x.device)
-		corr_locs = (dropout(torch.ones(x.shape))==0).to(device=x.device)
-		return torch.where(corr_locs,rand_replacement,x)
+if None is not loss_requests:
+	x = loss_requests(x)  # x_corruption_function = loss_requests
 ```
 
 3. Try it out as in the example above
 
 ### Example: Tracking Maximum Parameter Value, but only every now and then.
 
-1. In case you will want to turn this off, optionally add an argument `track_max: bool = True` in `model/train_params.py`
-2. In `model/train_params.py`, set `hyperparams_log_freq` to the frequency you would like to log this and other hyperparameters at - the number of batches to train between each logging of this metric.
-
-3. Open `model/lmtrainer.py` and navigate to the function `log_hyperparams_and_time`. Assuming you have added the argument `track_max` into `TrainParams`, add the lines:
+1. In case you will want to turn this off, add an argument `track_max: bool = True` in `train/train_params.py`
+2. In `train/train_params.py`, set `hyperparams_log_freq` to the frequency you would like to log this and other hyperparameters at - the number of batches to train between each logging of this metric.
+3. Open `train/trainer.py` and navigate to the function `log_hyperparams_and_time`. Assuming you have added the argument `track_max` into `TrainParams`, add the lines:
 
 ```
 if self.train_params.track_max:
@@ -397,10 +410,10 @@ into this function.
 
 4. This parameter will now (when requested through `track_max`) be tracked, and will show up in any wandb runs and appear in the `train_stats` dictionary of saved models.
 
-5. If you want to track this metric at *every* training batch, navigate instead to the function `get_loss` in `model/lmtrainer.py` and add the lines there instead:
+5. If you want to track this metric at *every* training batch, navigate instead to the function `training_step` in `train/trainer.py` and add the lines there instead:
 
 ```
-if self.train_params.track_max and from_train:
+if self.train_params.track_max:
 	max_param_val = max(p.max().item() for p in lm.parameters())
 	self.log_stat("max_param_val",max_param_val)
 ```
