@@ -1,0 +1,20 @@
+DataParams
+
+dataset_name = "wikitext"
+debug_crop = 10
+
+TrainParams 
+
+batch_size = 8
+epochs = 2
+no_wandb = False
+val_check_epoch_frac = 0.5
+
+ModelParams
+
+n_layers = 1
+n_heads = 1
+dim = 123
+layer_architecture = "hf-gpt2-lora"
+lora_rank = 2
+max_seq_len = 100

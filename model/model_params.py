@@ -11,6 +11,7 @@ class ModelParams:
     tokenizer_source_name: str = "custom"
     custom_tokenizer_ntokens: int = 20000
     layer_architecture: str = "torch-transformer"
+    lora_rank: int = 3  # relevant only for architecture hf-gpt2-lora
     individual_head_params: bool = False
     pos_encoding: str = "learned"
 
@@ -34,7 +35,10 @@ class ModelParams:
 #   than the input embedding dimension, e.g. with dim=256 and dim_ff_factor=2,
 #   the feedforward layers will have hidden dimension 512.
 # max_seq_len:
-#   Maximum input length the transformer can take, in number of tokens.
+#   Maximum input length the transformer can take, in number of tokens. If
+#   fine tuning will set to 
+#       min(max_seq_len, Mp) if max_seq_len <= 0 else Mp
+#   where Mp is the max_seq_len of the pretrained model being finetuned.
 # tokenizer_source_name:
 #   Specifies how to prepare the tokenizer. in all cases, the optimizer is
 #   adapted to some extent according to the dataset the model is created with.
@@ -66,6 +70,14 @@ class ModelParams:
 #           torch.nn.TransformerEncoderLayer for each layer of the transformer.
 #           Optimisations gone in favour of keeping implementation in python -
 #           hence customisable. The relevant files are in model/transformer/.
+#       "hf-gpt2-lora":
+#           Uses GPT2-small as taken from huggingface, with low-rank adaptation
+#           of rank lora_rank. Training will be applied only to the adaptation.
+#           All other arguments are ignored and overwritten to describe the
+#           loaded gpt2-small model
+# lora_rank:
+#   rank of the low-rank adaptation applied to huggingface gpt2, relevant only
+#   when setting layer_architecture = "hf-gpt2-lora"
 # individual_head_params:
 #   Implementation setting: how to store the parameters of each head in each
 #   transformer layer. Options:
