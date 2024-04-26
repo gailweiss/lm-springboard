@@ -263,8 +263,11 @@ def wikitextloader():
 
 
 def verysimplesamplesreader(path):
-    with open(path + "/data.txt", "r") as f:
-        res = [line[:-1] for line in f]
+    paths = glob.glob(f"{path}/*.txt")
+    res = []
+    for p in paths:
+        with open(p, "r") as f:
+            res += [line[:-1] for line in f]
     return res
 
 
