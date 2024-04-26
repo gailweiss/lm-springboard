@@ -6,7 +6,7 @@ At its base, this repository trains a transformer on a task of your choice, with
 
 ### Notes
 
-This repository also lets you poke around GPT2-small as taken from huggingface, albeit only in a limited interface that is adapted to match the one for the models you will train here. If your main goal is to poke around open source pretrained models - and with a much richer interface than here - then you probably want Neel Nanda's TransformerLens instead: [https://github.com/neelnanda-io/TransformerLens].
+This repository also lets you poke around GPT2-small as taken from huggingface, in an interface that is adapted to match the one for the models you will train here. That said, if your main goal is to poke around open source pretrained models, then you probably want Neel Nanda's TransformerLens instead: [https://github.com/neelnanda-io/TransformerLens].
 
 For now, this repository is only concerned with the autoregressive language modeling objective - i.e., decoders, as opposed to encoders or encoder-decoders (think GPT models as opposed to BERT or T5). There is one model wrapper: the LM (language model), and one trainer: the LMTrainer. 
 
@@ -104,9 +104,9 @@ In case you wish to plot something more complicated, here is a description of `t
 
 `train_stats` is a dictionary of all the metrics tracked in `lmtrainer.py` with the function `log_stat` during training training. Its keys are the names of all these metrics. Each individual metric is stored as a list of tuples `(n,v,c)` as follows: `v` is a value of the metric, `n` is the number of samples that had been trained on up until recording this value, and `c` is the stats counter - the number of values stored in `train_stats` (across all metrics) when this tuple was added. These lists of tuples are each sorted in increasing order of `c`. 
 
-## Load GPT2-small (Rudimentary for now)
+## Load GPT2-small
 
-You can load gpt2-small in here, though the interface is very limited for now.
+You can load gpt2-small, and sample it and its internal embeddings/attention patterns as you would the other models here
 
 ```
 import gpt2
@@ -114,23 +114,36 @@ lm_gpt2 = gpt2.get_gpt2()
 ```
 
 Cons: 
-- The code here doesn't take advantage of all the nice optimisations and options huggingface has provided. If you just use huggingface to load it (which is also very straightforward) you will get a model on which you can sample sequences efficiently and with various algorithms, whereas here you just have the one greedy sampler.
-- I haven't implemented getting GPT2's attention. I will really appreciate someone expanding this so I can get attention from GPT2-small as easily as I can get it from my own models. See the `forward` function in `model/lm.py` to see where to insert such code.
+- The code here doesn't take advantage of all the nice optimisations and options huggingface has provided. If you just use huggingface to load it (which is also very straightforward) you will get a model on which you can sample sequences efficiently and with various algorithms, whereas here you just have my simple sampling function.
 
 Pros: 
-- Except for inspecting attention, which is not yet implemented, you can use this to interact with gpt2 through the same interface as provided for the models trained here.
+- You can use this to interact with gpt2 through the same interface as provided for the models trained here - including sampling, plotting its attention patterns, or getting its internal embeddings.
 
-Overall, if you want to poke around open source pretrained models, you may prefer existing libraries for mechanistic interpretability - e.g. TransformerLens: [https://github.com/neelnanda-io/TransformerLens/]
+Still, if your main goal is to poke around open source pretrained models, you may prefer existing libraries for mechanistic interpretability - e.g. TransformerLens: [https://github.com/neelnanda-io/TransformerLens/]
 
 ## Inspect Model
 ### Generate
 
-Sample from your loaded model `lm` (or `lm_gpt2`) with the `sample` function, which allows receiving an initial prefix `pref` (string or list of token ids), a maximum sample length `max_seq_len` (in tokens, default 100), a sampling temperature `temperature` (default 1), and returning the sample either as a string or list of indices with the parameter `as_str` (default `True`). 
+Sample from your loaded model `lm` (or `lm_gpt2`) with the `sample` function:
+
 ```
 lm_gpt2.sample(pref="Well the weather for the whole area will",max_seq_len=50,temperature=0.5,as_str=True)
 lm_gpt2.sample(pref=[50256, 4053, 262, 6193])
 lm.sample(pref="")
 ```
+
+Main params: 
+- `pref` (string or list of token ids), the opening prefix for the sample, default `""`
+- `max_seq_len` the maximum sample length (in tokens), default 100,
+- `as_str` return the sample as a string (as opposed to a list of indices), default `True`
+
+Sampling params:
+- `temperature`, the sampling temperature (factor by which to divide the next-token logits before softmax, `0` shifts to argmax instead of softmax), default `1`
+- `nucleus`, restrict sampling to the minimal set of most probable tokens with total probability >=`nucleus`, default `None` (effectively `1`). Mutually exclusive with `top_k`
+- `top_k`, restrict sampling to the `top_k` most probable tokens, default `None` (effectively `self.n_tokens`). Mutually exclusive with `nucleus`
+
+No beam search here, but I will appreciate someone adding it in!
+
 ### Get Outputs
 
 Get the output embeddings of your language model on a batch of inputs (presented as a tensor with shape batch size x seq len) or single input (presented as a string, list of ids, 1-D tensor, or batch of size 1 as above) by calling it directly:
@@ -147,6 +160,16 @@ d = lm_gpt2(torch.Tensor(lm_gpt2.tokenizer(["hello","hi"]))) # batch
 assert False not in torch.isclose(a,d[0:1])
 ``` 
 
+If the samples in your batch have different lengths, you will want to collect and pad them. You can use the `mycollate` function from `data/dataloader.py` for that:
+
+```
+from data.dataloader import mycollate
+samples = ["hello","hi there"]
+pim = mycollate(lm_gpt2.tokenizer(samples))
+padded_indices, mask = pim["x_indices"], pim["mask"]
+e = lm_gpt2(padded_indices)
+```
+
 ### Compute Perplexity (or Cross Entropy Loss)
 
 Compute the perplexity (or cross entropy loss) of your language model on a set of sequences using its `perplexities` function, which computes the mean, maximum, and minumum per-token perplexity (or CE loss), and notes also how many tokens were considered for the computation. If setting `per_token=True` it also returns the perplexity (or CE loss) at every position, with shape (batch size X seq len -1), otherwise (if setting `per_token=False`) this value is an empty list. Set `before_exp=True` to get CE losses instead of perplexity.
@@ -155,7 +178,7 @@ The input sequences can be presented either as a list of sample strings, or a to
 
 For examples:
 ```
-mean_p, max_p, min_p, total_tokens, per_token_res = lm_gpt2.perplexities(["hello","hi"],per_token=True)
+mean_p, max_p, min_p, total_tokens, per_token_res = lm_gpt2.perplexities(["hello","hi there"],per_token=True)
 ```
 or
 ```
@@ -166,7 +189,7 @@ When applied to several sequences of different lengths, `per_token_res` is shape
 
 ### Inspect Attention
 
-Show the attention patterns of a transformer lm using the `model_explorer` function `show_lm_attns`. This function will work with the trainable transformers in this repository, if you add non-transformer layers however, you will have to edit the relevant logic in `model/transformer/transformer.py`. This function will not work on GPT2-small, but I will appreciate someone adding that in. 
+Show the attention patterns of a transformer lm using the `model_explorer` function `show_lm_attns`. This function will work with the trainable transformers in this repository, if you add non-transformer layers however, you will have to edit the relevant logic in `model/transformer/transformer.py`. 
 
 ```
 out_embeds, attns = model_explorer.show_lm_attns(lm,"as business managers know")
@@ -179,6 +202,17 @@ out_embeds, attns = model_explorer.show_lm_attns(lm,lm.tokenizer("as business ma
 ```
 
 This function also returns `out_embeds` and `attns`, which give the model's output logits and attention patterns on this input sequence as their names imply. Their shapes are `batch size (i.e. 1) x seq len x vocab size` and `batch size (i.e. 1) x n layers x n heads x seq len (in) x seq len (out)`, respectively.
+
+### Get Internal Embeddings
+
+Get a model's internal embeddings on a batch of inputs by passing `get_embeddings=True` when calling it (i.e. using its `forward` function).
+
+```
+from data.dataloader import mycollate
+samples = ["hello","hi there"]
+padded_indices = mycollate(lm_gpt2.tokenizer(samples))["x_indices"]
+embeddings = lm_gpt2(padded_indices,get_embeddings=True)["embeddings"]  # len(samples) X n layers X max seq len X model dim
+```
 
 # Basics: Configs
 ## Command Line Args

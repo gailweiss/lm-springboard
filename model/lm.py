@@ -40,7 +40,7 @@ class LM(nn.Module):
             if indices[-1] == eos:
                 return True
         while not stop(indices):
-            e = self([indices])  # batch size X seq len X vocab size
+            e = self([indices])["logits"]  # batch size X seq len X vocab size
             next_t = choose_output_index(e[0, -1, :], temperature=temperature,
                                          top_k=top_k, nucleus=nucleus)
             indices.append(next_t)
@@ -133,7 +133,7 @@ class LM(nn.Module):
         y = y.to(dtype=torch.long)  # cross entropy loss expects target to have
         # type 'long' and will crash without explanation otherwise, so lets
         # just be safe
-        z = self(x)
+        z = self(x)["logits"]
         return x, y, z
 
     def get_losses(self, batch, loss_requests=None):
@@ -173,7 +173,8 @@ class LM(nn.Module):
                      num_unmasked, mask)
         # res contains 0 where masked, as useful dummy value for means
 
-    def forward(self, x, get_attns=False, attn_requests=None):
+    def forward(self, x, get_attns=False, attn_requests=None, 
+                get_embeddings=False):
         # x shape: should be batch size x seq len, possibly padded.
         # but can be: just seq len (in which case will be reshaped to batch
         # size one), or even can be a string (in which case will be tokenized)
@@ -189,20 +190,33 @@ class LM(nn.Module):
               f"max len: {self.model_params.max_seq_len}"
         assert cond, msg
         if not self.is_from_pretrained:
-            e0 = self.embed(x)
+            e0 = self.embed(x) # batch size X seq len X embedding dim
+            embeddings_list = [e0] if get_embeddings else None
             eL, attns = self.decoder(e0, get_attns=get_attns,
-                                     attn_requests=attn_requests)
-            res = self.de_embedder(eL)
+                                     attn_requests=attn_requests,
+                                     embeddings_list=embeddings_list)
+            logits = self.de_embedder(eL)
         elif self.is_from_pretrained == "gpt2":
-            r = self.decoder(x)
-            res = r.logits
-            attns = None  # it seems there should actually be a way to easily
-            # get attentions from huggingface gpt2, but a lazy read online only
-            # showed how to do it when generating which isnt what i want here
+            r = self.decoder(x, output_attentions=get_attns, 
+                             output_hidden_states=get_embeddings)
+            logits = r.logits
+            attns = torch.stack(r.attentions).transpose(0, 1) if get_attns\
+                    else None
+            embeddings_list = r.hidden_states  # actually tuple but good enough
         else:
             raise Exception("lm of unknown type. from pretrained:",
                             self.is_from_pretrained)
-        return (res, attns) if get_attns else res
+        
+        embeddings = torch.stack(embeddings_list).transpose(0, 1) if\
+                     get_embeddings else None
+        # embeddings shape: 
+        # batch size X n layers + 1 X seq len X embedding dim
+        # (n layers + 1 because input embeddings)
+        # logits shape:
+        # batch size X seq len X vocab size
+        # attns shape:
+        # batch size X n layers X n heads X seq len (out) X seq len (in)
+        return {"logits": logits, "attns": attns, "embeddings": embeddings}
 
 
 def choose_output_index(e, temperature=0, top_k=None, nucleus=None):

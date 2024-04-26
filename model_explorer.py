@@ -36,7 +36,7 @@ def verify_stable_load(timestamp):
 
     msg = "two loaded models giving different outputs on same input - " +\
           "check models aren't in training mode?"
-    assert torch.equal(m1([[1, 2]]), m2([[1, 2]])), msg
+    assert torch.equal(m1([[1, 2]])["logits"], m2([[1, 2]])["logits"]), msg
 
     threshold = 1e-4
     val_diff1 = check_validation(*a1)
@@ -53,7 +53,7 @@ def verify_stable_load(timestamp):
     msg = "after checking val loss, two loaded models now giving different " +\
           "outputs on same input - check models haven't switched to " +\
           "training mode (pytorch lightning does this after validation)"
-    assert torch.equal(m1([[1, 2]]), m2([[1, 2]])), msg
+    assert torch.equal(m1([[1, 2]])["logits"], m2([[1, 2]])["logits"]), msg
 
     print("passed basic load checks")
 
@@ -124,9 +124,10 @@ def check_validation(lm, dataset, train_stats, params):
 
 def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
     # x: input sequence, whether as string or as list of token indices
-    z, attns = lm(x, get_attns=True)
+    res = lm(x, get_attns=True)
+    z, attns = res["logits"], res["attns"]
     attns = attns.detach()
-    # attns shape: batch size x n layers x n heads x in seq len x out seq len
+    # attns shape: batch size x n layers x n heads x out seq len x in seq len
     # batch size should be 1
 
     if None is not folder_name:
@@ -136,7 +137,7 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
     layers = list(range(attns.shape[1])) if None is layers else layers
     heads = list(range(attns.shape[2])) if None is heads else heads
     assert attns.shape[0] == 1  # single x - batch size 1
-    attns = attns[0]
+    attns = attns[0]  # n layers x n heads x out seq len x in seq len
     for layer in layers:
         for h in heads:
             fig, ax = plt.subplots()

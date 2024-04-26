@@ -38,7 +38,8 @@ class Transformer(nn.Module):
             )
         return res
 
-    def forward(self, x, get_attns=False, attn_requests=None):
+    def forward(self, x, get_attns=False, attn_requests=None, 
+                embeddings_list=None):
         # batch size X seq len X embed dim
         mask = self.causal_mask(x.shape[1], x.device, x.dtype)
         attns = []
@@ -55,6 +56,9 @@ class Transformer(nn.Module):
             else:
                 raise Exception("unknown layer_architecture: " +
                                 f"{self.model_params.layer_architecture}")
+            if None is not embeddings_list:
+                embeddings_list.append(x)
+                # accessed outside - lists get mutated
         attns = torch.stack(attns).transpose(0, 1) if attns else None
         # attns shape: batch size, n layers, n heads, seq len, seq len
         # x shape: batch size X seq len X embed dim
