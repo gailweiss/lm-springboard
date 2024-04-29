@@ -24,6 +24,7 @@ class DataParams:
     val_pct: int = 10
     test_pct: int = 5
     is_synthetic_task: bool = False  # for internal use
+    lines_per_sample: int = 1
 
 # dataset_name:
 #   Which dataset to load and train on. Current options:
@@ -58,12 +59,19 @@ class DataParams:
 # is_synthetic_task:
 #   Value for internal use: any value set here will be ignored and
 #   overwritten by get_data.
+# lines_per_sample:
+#   Relevant when loading a dataset from the local data folder: every text file
+#   read will be broken into multiple samples, with lines_per_sample lines for
+#   each sample. Default 1: 1 line per sample. If using -1: will not break up
+#   the files.
 
 
 def get_local_datafolder(n):
     if None is datapath:
         return None
-    ps = glob.glob(f"{datapath}/*")
+    ps = glob.glob(f"{datapath}/*") +\
+        glob.glob(f"{datapath}/*/*") +\
+        glob.glob(f"{datapath}/*/*/*")
     dd = f"{datapath}/"
     return next((p for p in ps if dd.join(p.split(dd)[1:]) == n), None)
 
@@ -71,7 +79,7 @@ def get_local_datafolder(n):
 def get_data(data_params):
     data_params.is_synthetic_task = False
     if data_params.dataset_name == "dummy":
-        samples = verysimplesamplesreader(".")
+        samples = verysimplesamplesreader(".", data_params)
     elif data_params.dataset_name == "wikitext":
         samples = wikitextloader()
     elif data_params.dataset_name == "ptb":
@@ -81,7 +89,8 @@ def get_data(data_params):
         samples = syntheticdatasets.get(data_params.dataset_name)
     elif None is not get_local_datafolder(data_params.dataset_name):
         samples = verysimplesamplesreader(
-                    get_local_datafolder(data_params.dataset_name))
+                    get_local_datafolder(data_params.dataset_name),
+                    data_params)
     else:
         raise Exception(f"unknown dataset: {data_params.dataset_name}")
     if data_params.debug_crop:
@@ -262,13 +271,19 @@ def wikitextloader():
     return {n: regroup_page_lines(d[n]) for n in d}
 
 
-def verysimplesamplesreader(path):
+def verysimplesamplesreader(path, data_params):
     paths = glob.glob(f"{path}/*.txt")
-    res = []
+    all_samples = []
     for p in paths:
         with open(p, "r") as f:
-            res += [line[:-1] for line in f]
-    return res
+            all_lines = f.readlines()
+        if data_params.lines_per_sample < 0:
+            all_samples.append("".join(all_lines))
+        else:
+            for i in range(0, len(all_lines), data_params.lines_per_sample):
+                all_samples.append("".join(
+                    all_lines[i: i + data_params.lines_per_sample]))
+    return all_samples
 
 
 def mycollate(b):
