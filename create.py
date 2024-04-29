@@ -57,7 +57,9 @@ def sync_model_params(requested_model_params, lora_gpt2_model_params):
         requested_model_params.layer_architecture  # hf-gpt2-lora
     lora_gpt2_model_params.lora_rank = requested_model_params.lora_rank
     if requested_model_params.max_seq_len > 0:
-        lora_gpt2_model_params.max_seq_len = requested_model_params.max_seq_len
+        lora_gpt2_model_params.max_seq_len = \
+            min(requested_model_params.max_seq_len,
+                lora_gpt2_model_params.max_seq_len)
 
     # now the rest of the factors are from loading gpt2, so write them back:
     for a, v in dataclasses.asdict(lora_gpt2_model_params).items():
