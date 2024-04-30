@@ -34,8 +34,8 @@ def _load_custom_tokenizer(path):
 
 
 def load_stored_tokenizer_if_exists(source_name, folder_name, verbose):
-    if (source_name == "custom" or 
-        (True in [n in source_name for n in ["gpt2", "bert"]])):
+    if source_name == "custom" or \
+       (True in [n in source_name for n in ["gpt2", "bert"]]):
         # parallel conditions to those of 'save' functions in MyTokenizer below
         return MyTokenizer(name=source_name, from_path=folder_name,
                            verbose_init=verbose)
@@ -190,8 +190,8 @@ class MyTokenizer:
     def save(self, path):
         if self.name == "custom":
             self.tokenizer.internal.save(full_path(path))
-        elif True in [n in self.name for n in ["gpt2","bert"]]:
-            core = {"name": self.name, 
+        elif True in [n in self.name for n in ["gpt2", "bert"]]:
+            core = {"name": self.name,
                     "no_crop": self.no_crop,
                     "type": "from_pretrained"}
             if self.masking_cropped:
@@ -216,7 +216,7 @@ class MyTokenizer:
             print("vocab size before cropping tokenizer:", self.vocab_size())
 
         def get_used_ids():
-            if self.from_path: # i.e. loaded from somewhere - already have the
+            if self.from_path:  # i.e. loaded from somewhere - already have the
                 # correct ids!
                 return self.ids_self2tokenizer
             actual_used_ids = set()

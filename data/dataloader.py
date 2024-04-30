@@ -67,8 +67,8 @@ class DataParams:
 #   the files.
 # max_seq_len:
 #   Maximum sequence length (in token) to make the data samples. <=0: matches
-#   model max sequence length. Can be relevant when finetuning if have big model
-#   but only want to finetune up to certain length
+#   model max sequence length. Can be relevant when finetuning if have big
+#   model but only want to finetune up to certain length
 
 
 def get_local_datafolder(n):
@@ -118,7 +118,7 @@ class LMDataModule(pl.LightningDataModule):
 
         self.max_seq_len = self.model_params.max_seq_len
         if self.data_params.max_seq_len > 0:
-            self.max_seq_len = min(self.max_seq_len, 
+            self.max_seq_len = min(self.max_seq_len,
                                    self.data_params.max_seq_len)
 
         if isinstance(data, list):

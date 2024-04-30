@@ -27,6 +27,7 @@ def get_adaptor(orig_mat, lora_params):
     else:
         raise Exception("unexpected weight shape for low rank adaptation")
 
+
 class LoRA(nn.Module):
     def __init__(self, param, lora_params):
         self.pdim = len(param.shape)
@@ -55,15 +56,20 @@ class LoralizedModule(nn.Module):
         assert not hasattr(self.module, "loralized")
         # don't know what kind of mess it would make to apply this twice to the
         # same module, so avoid for now
+
         def apply_direct_params_lora(module):
-            direct_params = [p for p in module.named_parameters() if "." not in p[0]]
-            for n,p in direct_params:
+            direct_params = [p for p in module.named_parameters() if
+                             "." not in p[0]]
+            for n, p in direct_params:
                 p.requires_grad_(False)
-                parametrize.register_parametrization(module, n, LoRA(p, self.lora_params))
+                parametrize.register_parametrization(module, n,
+                                                     LoRA(p, self.lora_params))
+
         def recursive_module_lora(module):
             apply_direct_params_lora(module)
             for c in module.children():
                 recursive_module_lora(c)
+
         self.loralized = True
 
     def forward(self, *args, **kwargs):

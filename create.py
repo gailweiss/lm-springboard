@@ -63,12 +63,12 @@ def make_model_and_data(data_params, model_params, train_params,
                         tokenizer=None, verbose=True):
     if model_params.from_saved or (model_params.from_os_pretrained == "gpt2"):
         if model_params.from_saved:
-            from model_explorer import get_model_by_timestamp  
+            from model_explorer import get_model_by_timestamp
             # uses saver to load which uses create for the skeleton, i.e. it's
             # going to be calling this function again, but with the saved
             # model_params as opposed to these ones. instead of implementing
-            # getting from timestamp twice, i'll be a bit messy and just import the
-            # function here where it won't cause a circular import
+            # getting from timestamp twice, i'll be a bit messy and just import
+            # the function here where it won't cause a circular import
             lm = get_model_by_timestamp(model_params.from_saved)[0]
         elif model_params.from_os_pretrained == "gpt2":
             lm = get_gpt2()
@@ -82,7 +82,7 @@ def make_model_and_data(data_params, model_params, train_params,
             lm.tokenizer = tokenizer
         model, tokenizer = lm.decoder, lm.tokenizer
         sync_model_params(model_params, lm.model_params)
-    
+
     tokenizer, dataset = make_tokenizer_and_data(data_params,
                                                  model_params,
                                                  train_params,
@@ -101,8 +101,6 @@ def make_model_and_data(data_params, model_params, train_params,
 
     if train_params.lora_rank > 0:
         apply_lora_to_lm(lm, train_params)
-
-
 
     return lm, dataset
 
