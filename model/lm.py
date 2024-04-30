@@ -7,14 +7,16 @@ from tqdm import tqdm
 
 
 class LM(nn.Module):
-    def __init__(self, tokenizer, model, model_params,
-                 is_from_pretrained=False):
+    def __init__(self, tokenizer, model, model_params):
         super().__init__()
-        self.is_from_pretrained = is_from_pretrained
         self.model_params = model_params
         self.decoder = model
         self.n_tokens = tokenizer.vocab_size()
-        if not self.is_from_pretrained:
+        if self.model_params.from_os_pretrained == "gpt2":
+            self.embed = None
+            self.de_embedder = None
+        else:
+            assert not self.model_params.from_os_pretrained
             self.embed = FullEmbedding(
                 model_params.dim, self.n_tokens, model_params.max_seq_len,
                 positional_encoding_type=model_params.pos_encoding)
@@ -190,14 +192,14 @@ class LM(nn.Module):
         msg = f"got input over maximum expected length: {x.shape}, " +\
               f"max len: {self.model_params.max_seq_len}"
         assert cond, msg
-        if not self.is_from_pretrained:
+        if not self.model_params.from_os_pretrained:
             e0 = self.embed(x)  # batch size X seq len X embedding dim
             embeddings_list = [e0] if get_embeddings else None
             eL, attns = self.decoder(e0, get_attns=get_attns,
                                      attn_requests=attn_requests,
                                      embeddings_list=embeddings_list)
             logits = self.de_embedder(eL)
-        elif self.is_from_pretrained == "gpt2":
+        elif self.model_params.from_os_pretrained == "gpt2":
             r = self.decoder(x, output_attentions=get_attns,
                              output_hidden_states=get_embeddings)
             logits = r.logits
@@ -206,7 +208,7 @@ class LM(nn.Module):
             embeddings_list = r.hidden_states  # actually tuple but good enough
         else:
             raise Exception("lm of unknown type. from pretrained:",
-                            self.is_from_pretrained)
+                            self.from_os_pretrained)
 
         embeddings = torch.stack(embeddings_list).transpose(0, 1) if\
             get_embeddings else None

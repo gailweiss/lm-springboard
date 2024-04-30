@@ -25,6 +25,7 @@ class DataParams:
     test_pct: int = 5
     is_synthetic_task: bool = False  # for internal use
     lines_per_sample: int = 1
+    max_seq_len: int = -1
 
 # dataset_name:
 #   Which dataset to load and train on. Current options:
@@ -64,6 +65,10 @@ class DataParams:
 #   read will be broken into multiple samples, with lines_per_sample lines for
 #   each sample. Default 1: 1 line per sample. If using -1: will not break up
 #   the files.
+# max_seq_len:
+#   Maximum sequence length (in token) to make the data samples. <=0: matches
+#   model max sequence length. Can be relevant when finetuning if have big model
+#   but only want to finetune up to certain length
 
 
 def get_local_datafolder(n):
@@ -103,13 +108,18 @@ def get_data(data_params):
 
 
 class LMDataModule(pl.LightningDataModule):
-    def __init__(self, data, tokenizer, data_params,
-                 model_params, verbose_init=False):
+    def __init__(self, data, tokenizer, data_params, model_params,
+                 verbose_init=False):
         super().__init__()
         self.data_params = data_params
         self.model_params = model_params
         self.tokenizer = tokenizer
         self.verbose_init = verbose_init
+
+        self.max_seq_len = self.model_params.max_seq_len
+        if self.data_params.max_seq_len > 0:
+            self.max_seq_len = min(self.max_seq_len, 
+                                   self.data_params.max_seq_len)
 
         if isinstance(data, list):
             self.setup_from_list(data)
@@ -142,17 +152,17 @@ class LMDataModule(pl.LightningDataModule):
 
     def chunk_long_samples(self, tokenized_data):
         # breaks long samples into samples of length up to
-        # self.model_params.max_seq_len, so len(res) >= len(tokenized_data)
+        # self.max_seq_len, so len(res) >= len(tokenized_data)
         res = []
         for s in tokenized_data:
             if (self.data_params.is_synthetic_task and
                not self.data_params.breaking_synthetic_samples_ok):
                 msg = f"got synthetic sample longer than allowed: {len(s)}" +\
-                      f" tokens (max allowed: {self.model_params.max_seq_len})"
-                assert len(s) <= self.model_params.max_seq_len, msg
-            for i in range(0, len(s), self.model_params.max_seq_len):
+                      f" tokens (max allowed: {self.max_seq_len})"
+                assert len(s) <= self.max_seq_len, msg
+            for i in range(0, len(s), self.max_seq_len):
                 def get_chunk(lst):
-                    return lst[i:i + self.model_params.max_seq_len + 1]
+                    return lst[i:i + self.max_seq_len + 1]
                 schunk = get_chunk(s)
                 # +1 to have max_len + 1 tokens, as the first max_len are input
                 #  and the last max_len are prediction

@@ -12,7 +12,7 @@ def get_gpt2():
     gpt2 = AutoModelForCausalLM.from_pretrained("gpt2")
 
     # my code uses these
-    gpt2.n_tokens = gpt2.transformer.wte.weight.shape[0]
+    model_params.from_os_pretrained = "gpt2"
     model_params.max_seq_len = gpt2.transformer.wpe.weight.shape[0]
     model_params.layer_architecture = "gpt2-transformer"
 
@@ -29,5 +29,5 @@ def get_gpt2():
     model_params.individual_head_params = False
 
     tokenizer = MyTokenizer(data=None, name="gpt2", no_crop=True)
-    lm = LM(tokenizer, gpt2, model_params, is_from_pretrained="gpt2")
+    lm = LM(tokenizer, gpt2, model_params)
     return lm

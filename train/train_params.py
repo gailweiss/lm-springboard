@@ -20,6 +20,8 @@ class TrainParams:
     scheduler_factor: float = 0.995
     patience: int = 10
     lr_cycle_steps: int = 500
+    lora_rank: int = 0
+    lora_std: float = 0.02
 
 # batch_size:
 #   The batch size used for the training and validation sets
@@ -83,3 +85,8 @@ class TrainParams:
 #   Relevant only for "Plateau" scheduler, used as described above
 # lr_cycle_steps:
 #   Relevant only for "Cosine" and "Cyclic" schedulers, used as described above
+# lora_rank:
+#   Rank of the low-rank adaptation applied when fine tuning. Only applied if
+#   lora_rank>0, in this case, will only train the low-rank adaptation.
+# lora_std:
+#   Standard deviation for initialisation of the low-rank adaptation values.

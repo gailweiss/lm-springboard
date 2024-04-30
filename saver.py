@@ -7,7 +7,7 @@ from train.trainer import Trainer
 from train.train_params import TrainParams
 from model.model_params import ModelParams
 from data.dataloader import DataParams
-from model.tokenizer import MyTokenizer
+from model.tokenizer import load_stored_tokenizer_if_exists
 
 
 def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
@@ -40,12 +40,8 @@ def load_model(folder_name, full=False, verbose=True):
     with open(path_join(folder_name, "train_stats.json"), "r") as f:
         train_stats = json.load(f)
 
-    if model_params.tokenizer_source_name == "custom":
-        # then need to load the tokenizer
-        tokenizer = MyTokenizer(name=model_params.tokenizer_source_name,
-                                from_path=folder_name, verbose_init=verbose)
-    else:
-        tokenizer = None
+    tokenizer = load_stored_tokenizer_if_exists(
+        model_params.tokenizer_source_name, folder_name, verbose)
 
     train_params.no_wandb = True  # no wandb in loaded models - or it will
     # try (unsuccessfully) to send validation losses to wandb when doing a

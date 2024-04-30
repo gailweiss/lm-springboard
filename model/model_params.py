@@ -11,7 +11,8 @@ class ModelParams:
     tokenizer_source_name: str = "custom"
     custom_tokenizer_ntokens: int = 20000
     layer_architecture: str = "torch-transformer"
-    lora_rank: int = 3  # relevant only for architecture hf-gpt2-lora
+    from_os_pretrained: str = ""
+    from_saved: str = ""
     individual_head_params: bool = False
     pos_encoding: str = "learned"
 
@@ -36,7 +37,7 @@ class ModelParams:
 #   the feedforward layers will have hidden dimension 512.
 # max_seq_len:
 #   Maximum input length the transformer can take, in number of tokens. If
-#   fine tuning will set to:
+#   fine tuning will only affect the fine-tuning dataset, in this case using:
 #       min(max_seq_len, Mp) if max_seq_len <= 0 else Mp
 #   where Mp is the max_seq_len of the pretrained model being finetuned.
 # tokenizer_source_name:
@@ -70,14 +71,20 @@ class ModelParams:
 #           torch.nn.TransformerEncoderLayer for each layer of the transformer.
 #           Optimisations gone in favour of keeping implementation in python -
 #           hence customisable. The relevant files are in model/transformer/.
-#       "hf-gpt2-lora":
-#           Uses GPT2-small as taken from huggingface, with low-rank adaptation
-#           of rank lora_rank. Training will be applied only to the adaptation.
-#           All other arguments are ignored and overwritten to describe the
-#           loaded gpt2-small model
-# lora_rank:
-#   rank of the low-rank adaptation applied to huggingface gpt2, relevant only
-#   when setting layer_architecture = "hf-gpt2-lora"
+# from_os_pretrained:
+#   If not empty, load an open source pretrained model as the initial model
+#   state. Except for max_seq_len, all arguments describing the model
+#   architecture are overwritten to describe the pretrained model (for
+#   max_seq_len, get minimum between given max_seq_len and model max_seq_len).
+#   Currently only one pretrained option: "gpt2", which will get gpt2-small
+#   from huggingface. Superseded by from_saved.
+# from_saved:
+#   If not empty, load a saved model as the initial model state. Except for
+#   max_seq_len, all arguments describing the model architecture are
+#   overwritten to describe the saved model (for max_seq_len, get minimum
+#   between given max_seq_len and model max_seq_len). Supersedes from_saved.
+#   Describes saved_model as timestamp for get_model_by_timestamp in
+#   model_explorer, e.g. from_saved = "2024-01-01--00-00-00".
 # individual_head_params:
 #   Implementation setting: how to store the parameters of each head in each
 #   transformer layer. Options:

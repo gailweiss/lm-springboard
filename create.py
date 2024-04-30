@@ -5,7 +5,7 @@ from model.model_params import ModelParams
 from train.train_params import TrainParams
 from model.lm import LM
 from gpt2 import get_gpt2
-from model.loralizer import add_lora
+from train.loralizer import apply_lora_to_lm
 import dataclasses
 
 
@@ -50,46 +50,59 @@ def make_tokenizer_and_data(data_params, model_params, train_params,
     return tokenizer, dataset
 
 
-def sync_model_params(requested_model_params, lora_gpt2_model_params):
-    # the only factors that the outside request actually influences
-    # in creation of the model:
-    lora_gpt2_model_params.layer_architecture = \
-        requested_model_params.layer_architecture  # hf-gpt2-lora
-    lora_gpt2_model_params.lora_rank = requested_model_params.lora_rank
-    if requested_model_params.max_seq_len > 0:
-        lora_gpt2_model_params.max_seq_len = \
-            min(requested_model_params.max_seq_len,
-                lora_gpt2_model_params.max_seq_len)
-
-    # now the rest of the factors are from loading gpt2, so write them back:
-    for a, v in dataclasses.asdict(lora_gpt2_model_params).items():
-        setattr(requested_model_params, a, v)
+def sync_model_params(requested_model_params, loaded_model_params):
+    # these factors are from the loaded model, so write them back:
+    for a in ["n_layers", "n_heads", "dim", "dim_ff_factor",
+              "tokenizer_source_name", "custom_tokenizer_ntokens",
+              "layer_architecture", "from_os_pretrained",
+              "individual_head_params", "pos_encoding", "max_seq_len"]:
+        setattr(requested_model_params, a, getattr(loaded_model_params, a))
 
 
 def make_model_and_data(data_params, model_params, train_params,
                         tokenizer=None, verbose=True):
-    if model_params.layer_architecture == "hf-gpt2-lora":
-        lm_gpt2 = get_gpt2()
-        assert None is tokenizer
-        tokenizer = lm_gpt2.tokenizer
-        sync_model_params(model_params, lm_gpt2.model_params)
-
+    if model_params.from_saved or (model_params.from_os_pretrained == "gpt2"):
+        if model_params.from_saved:
+            from model_explorer import get_model_by_timestamp  
+            # uses saver to load which uses create for the skeleton, i.e. it's
+            # going to be calling this function again, but with the saved
+            # model_params as opposed to these ones. instead of implementing
+            # getting from timestamp twice, i'll be a bit messy and just import the
+            # function here where it won't cause a circular import
+            lm = get_model_by_timestamp(model_params.from_saved)[0]
+        elif model_params.from_os_pretrained == "gpt2":
+            lm = get_gpt2()
+        elif model_params.from_os_pretrained:
+            raise NotImplementedError("unknown pretrained model requested:" +
+                                      f"{model_params.from_os_pretrained}")
+        sync_model_params(model_params, lm.model_params)
+        if None is not tokenizer:
+            # (this better be a call from saver.load_model, passing an already
+            # cropped tokenizer)
+            lm.tokenizer = tokenizer
+        model, tokenizer = lm.decoder, lm.tokenizer
+        sync_model_params(model_params, lm.model_params)
+    
     tokenizer, dataset = make_tokenizer_and_data(data_params,
                                                  model_params,
                                                  train_params,
                                                  existing_tokenizer=tokenizer,
                                                  verbose=verbose)
 
-    if model_params.layer_architecture == "hf-gpt2-lora":
-        lm = lm_gpt2
-        lm.decoder = add_lora(lm.decoder, model_params.lora_rank)
-    else:
+    if not model_params.from_os_pretrained:
         if "transformer" in model_params.layer_architecture:
-            transformer = Transformer(model_params, train_params)
+            model = Transformer(model_params, train_params)
         else:  # hoping to add e.g. RNNs, S6, etc in the future
             raise Exception("unknown layer_architecture:" +
                             f"{model_params.layer_architecture}")
-        lm = LM(tokenizer, transformer, model_params)
+
+    if not model_params.from_saved:
+        lm = LM(tokenizer, model, model_params)
+
+    if train_params.lora_rank > 0:
+        apply_lora_to_lm(lm, train_params)
+
+
 
     return lm, dataset
 
