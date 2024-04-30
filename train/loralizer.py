@@ -30,6 +30,7 @@ def get_adaptor(orig_mat, lora_params):
 
 class LoRA(nn.Module):
     def __init__(self, param, lora_params):
+        super().__init__()
         self.pdim = len(param.shape)
         if self.pdim == 1:
             self.a = get_adaptor(param, lora_params)
@@ -66,10 +67,11 @@ class LoralizedModule(nn.Module):
                                                      LoRA(p, self.lora_params))
 
         def recursive_module_lora(module):
-            apply_direct_params_lora(module)
             for c in module.children():
                 recursive_module_lora(c)
+            apply_direct_params_lora(module)
 
+        recursive_module_lora(self)
         self.loralized = True
 
     def forward(self, *args, **kwargs):
