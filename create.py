@@ -5,8 +5,8 @@ from model.model_params import ModelParams
 from train.train_params import TrainParams
 from model.lm import LM
 from gpt2 import get_gpt2
-from train.loralizer import apply_lora_to_lm
 import dataclasses
+from train.lora import apply_lora_to_model
 
 
 def make_tokenizer_and_data(data_params, model_params, train_params,
@@ -100,7 +100,7 @@ def make_model_and_data(data_params, model_params, train_params,
         lm = LM(tokenizer, model, model_params)
 
     if train_params.lora_rank > 0:
-        apply_lora_to_lm(lm, train_params)
+        apply_lora_to_model(lm, train_params)
 
     return lm, dataset
 
