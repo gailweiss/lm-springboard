@@ -114,7 +114,7 @@ def compute_validation(lm, dataset, params, sample=True):
 
 
 def check_validation(lm, dataset, train_stats, params):
-    recorded_val_loss = train_stats["validation_loss"][-1][1]
+    recorded_val_loss = train_stats["val_loss:main"][-1][1]
     curr_val_loss = compute_validation(lm, dataset, params, sample=False)
     print("last recorded val loss:", recorded_val_loss,
           ", loaded model val loss:", curr_val_loss,

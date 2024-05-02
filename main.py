@@ -9,7 +9,7 @@ import lightning as pl
 import argparse
 from dataclasses import asdict
 import wandb
-from util import get_timestamp, print_nicely_nested, in_try, DebugException
+from util import get_timestamp, print_nicely_nested, in_try
 from saver import save_model
 from create import make_model_and_data
 import shutil
@@ -135,9 +135,6 @@ def train(args, lm, dataset, tp):
 
     mytrainer = Trainer(lm, tp, start_time=start_time)
 
-    if args.return_things:
-        raise DebugException(lm=lm, pltrainer=pltrainer, dataset=dataset,
-                             mytrainer=mytrainer)
     pltrainer.fit(mytrainer, dataset.train_dataloader(tp.batch_size),
                   dataset.val_dataloader(tp.batch_size))
     pltrainer.validate(mytrainer,
@@ -172,8 +169,6 @@ def run_config(args, dp, tp, mp, namer):
 
         lm, dataset = make_model_and_data(dp, mp, tp)
         res = train(args, lm, dataset, tp)
-        if isinstance(res, DebugException):
-            raise res  # wanted it to go up
         if not isinstance(res, Exception):
             lm, pltrainer, mytrainer = res
             sample = lm.sample(max_seq_len=50, temperature=0.5)

@@ -14,20 +14,6 @@ import torch
 from datetime import datetime
 
 
-class DebugException(Exception):
-    def __init__(self, **kw):
-        super().__init__()
-        for k, v in kw.items():
-            setattr(self, k, v)
-        self.keys = list(kw.keys())
-
-    def __repr__(self):
-        return str(self)
-
-    def __str__(self):
-        return f"DebugException with keys: {self.keys}"
-
-
 class GlobalTimingDepth:
     def __init__(self):
         self.d = -1
