@@ -129,9 +129,7 @@ def train(args, lm, dataset, tp):
         devices=1 if args.gpu_id is None else [args.gpu_id],  # only run on 1
         # device, else it runs all of main.py n_devices times (????).
         # presumably its for multi-gpu training but i haven't learned how yet
-        accumulate_grad_batches=tp.accumulate_grad_batches,
-        max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac,
-        gradient_clip_val=tp.gradient_clip_val)
+        max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
 
     mytrainer = Trainer(lm, tp, start_time=start_time)
 

@@ -25,6 +25,9 @@ class Trainer(pl.LightningModule):
         self.last_val_loss = None
         # for reading the val loss after initiating a validation check with
         # lightning, used by model_explorer.py
+        self.automatic_optimization = False
+        # gain more control of optimization - lightning automatic optimization
+        # quite constrained in options
 
     def log_stat(self, name, val):
         if not self.train_params.no_wandb:
@@ -35,17 +38,6 @@ class Trainer(pl.LightningModule):
         self.logged_stats_dict[name].append((self.n_train_samples,
                                              val,
                                              self.stat_counter))
-
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
-        optimizer.step(closure=optimizer_closure)
-        optimizer.zero_grad()
-        self.maybe_log_hyperparams_and_time()
-        self.curr_steps_count += 1
-        self.this_lm_total_batches += 1
-        if torch.cuda.is_available:
-            torch.cuda.empty_cache()
-        if hasattr(torch, "mps"):
-            torch.mps.empty_cache()
 
     def on_train_epoch_start(self):
         self.curr_steps_count = 0
@@ -114,9 +106,15 @@ class Trainer(pl.LightningModule):
             self.log_hyperparams_and_time()
 
     def training_step(self, batch, batch_idx):
-        # not actually a "training_step" rather, a step in the computation
-        # of the loss for the optimizer step (which may be only every x
-        # train_steps, specifically x=accumulate_grad_batches)
+        self.curr_steps_count += 1
+        self.this_lm_total_batches += 1
+
+        if torch.cuda.is_available:
+            torch.cuda.empty_cache()
+        if hasattr(torch, "mps"):
+            torch.mps.empty_cache()
+        self.maybe_log_hyperparams_and_time()
+
         losses, n_samples = self.model.get_losses(batch)
         self.n_train_samples += n_samples
         self.record_type_losses(losses, self.curr_train_losses_by_type,
@@ -125,7 +123,16 @@ class Trainer(pl.LightningModule):
         self.log("train_batch_loss", main_loss.item())  # for the lr scheduler
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
-        return main_loss
+        self.manual_backward(main_loss)
+        if (batch_idx + 1) % self.train_params.accumulate_grad_batches == 0:
+            opt = self.optimizers()
+            self.clip_gradients(
+                opt, gradient_clip_val=self.train_params.gradient_clip_val,
+                gradient_clip_algorithm="norm")
+            opt.step()
+            opt.zero_grad()
+            sched = self.lr_schedulers()
+            sched.step(self.trainer.callback_metrics["train_batch_loss"])
 
     def validation_step(self, batch, batch_idx):
         losses, n_samples = self.model.get_losses(batch)
@@ -155,33 +162,36 @@ class Trainer(pl.LightningModule):
             raise Exception("unknown scheduler type:",
                             self.train_params.scheduler_type)
 
-    def configure_optimizers(self):
+    def reconfigure_optimizers(self):
+        optimizers, _ = self.configure_optimizers(
+            existing_scheduler=self.lr_schedulers())
+        self.optimizers()._optimizer = optimizers[0]
+
+    def configure_optimizers(self, existing_scheduler=None):
         optimizer = torch.optim.Adam(self.parameters(),
                                      lr=self.train_params.lr)
 
         def f_warmup(n):
             assert n <= self.train_params.warm_steps
             return n / self.train_params.warm_steps
+
         s_warmup = torch.optim.lr_scheduler.LambdaLR(optimizer, f_warmup)
         s_main = self.make_main_scheduler(optimizer)
-        s_full = MyChainedScheduler(optimizer, [s_warmup, s_main],
-                                    milestones=[self.train_params.warm_steps])
+        s_full = MyChainedScheduler() if None is existing_scheduler else \
+            existing_scheduler
+        s_full.setup(optimizer, [s_warmup, s_main],
+                     milestones=[self.train_params.warm_steps])
         # get scheduler started, else first batch has max value apparently
         s_full.step(None)
-        s_main = {"scheduler": s_full,
-                  "monitor": "train_batch_loss",
-                  "interval": "step",
-                  "reduce_on_plateau": True}
-        # lightning wont pass the loss through if you dont tell it that
-        # it's reduce_on_plateau >:(
+        s_main = {"scheduler": s_full}
         return [optimizer], [s_main]
-
-    def lr_scheduler_step(self, scheduler, metric):
-        scheduler.step(metric)
 
 
 class MyChainedScheduler:
-    def __init__(self, optimizer, schedulers, milestones):
+    def __init__(self):
+        pass
+
+    def setup(self, optimizer, schedulers, milestones):
         self.optimizer = optimizer
         self.schedulers = schedulers
         self.milestones = milestones  # the # steps after which to switch
