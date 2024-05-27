@@ -5,8 +5,7 @@ import torch.nn.functional as F
 from model.transformer.transformer import Transformer
 from copy import deepcopy
 import torch.nn.utils.parametrize as parametrize
-from functools import reduce
-
+from util import get_parent_module, get_nested_param
 
 class LoRA(nn.Module):
     def __init__(self, param, lora_params):
@@ -29,17 +28,6 @@ class LoRA(nn.Module):
             return param + self.a
         elif self.pdim == 2:
             return param + (self.a1 @ self.a2)
-
-
-def get_parent_module(module, full_param_name):
-    names = full_param_name.split(".")[:-1]
-    # last one is the parameter name
-    return reduce(getattr, names, module)
-
-
-def get_nested_param(module, full_param_name):
-    names = full_param_name.split(".")
-    return reduce(getattr, names, module)
 
 
 def apply_lora_to_model(model, lora_params):

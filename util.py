@@ -12,6 +12,7 @@ import subprocess
 import multiprocessing
 import torch
 from datetime import datetime
+from functools import reduce
 
 
 class GlobalTimingDepth:
@@ -177,3 +178,14 @@ def print_nicely_nested(d, file=sys.stdout, skip_first=True, indent=" " * 8,
         else:  # i dont know what this is
             print_simply(d)
     print_nested(d)
+
+
+def get_parent_module(module, full_param_name):
+    names = full_param_name.split(".")[:-1]
+    # last one is the parameter name
+    return reduce(getattr, names, module)
+
+
+def get_nested_param(module, full_param_name):
+    names = full_param_name.split(".")
+    return reduce(getattr, names, module)
