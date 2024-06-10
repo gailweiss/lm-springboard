@@ -19,6 +19,23 @@ def get_model_by_timestamp(timestamp, verbose=True):
     return lm, dataset, train_stats, params
 
 
+def get_all_checkpoints_by_timestamp(timestamp, verbose=True, skip_data=False):
+    p_final = get_full_path(timestamp)
+    p_containing = p_final[:-len("/final/")]
+    paths = glob.glob(f"{p_containing}/*/")
+    results = {}
+    tokenizer = None
+    for p in paths:
+        desc = p.split("/")[-2]
+        desc = "final" if desc == "final" else int(desc)
+        full = saver.load_model(p, full=True, verbose=verbose, 
+            skip_data=None is not tokenizer, known_tokenizer=tokenizer)
+        lm, dataset, train_stats = full[:3]
+        results[desc] = {"lm":lm, "train_stats":train_stats}
+        tokenizer = lm.tokenizer
+    return results
+
+
 def verify_stable_load(timestamp):
     a1 = get_model_by_timestamp(timestamp)
     a2 = get_model_by_timestamp(timestamp)
@@ -60,14 +77,7 @@ def verify_stable_load(timestamp):
 
 def get_full_path(timestamp):
     paths = glob.glob("../saved-models/**/", recursive=True)
-    paths = [p for p in paths if timestamp in p]
-    if len(paths) == 2:
-        if paths[0] in paths[1]:
-            # timestamp appeared twice in path, remove the sub-path
-            paths = paths[1:]
-        elif paths[1] in paths[0]:
-            # timestamp appeared twice in path, remove the sub-path
-            paths = paths[1:]
+    paths = [p for p in paths if (timestamp in p and p.endswith("/final/"))]
     if len(paths) == 1:
         return paths[0]
     if len(paths) < 1:

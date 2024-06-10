@@ -22,6 +22,7 @@ class TrainParams:
     lr_cycle_steps: int = 500
     lora_rank: int = 0
     lora_std: float = 0.02
+    checkpoint_every: int = 0
 
 # batch_size:
 #   The batch size used for the training and validation sets
@@ -90,3 +91,10 @@ class TrainParams:
 #   lora_rank>0, in this case, will only train the low-rank adaptation.
 # lora_std:
 #   Standard deviation for initialisation of the low-rank adaptation values.
+# checkpoint_every:
+#   How often to save a checkpoint of the model. 0: don't. -1: every validation
+#   step. n>0: every n training samples (or closest approximation with
+#   available batch size, specifically: save every time n_samples have
+#   increased by >=n since last save).
+#   Relevant only when also passing --save through the args, otherwise will be
+#   overridden to 0.

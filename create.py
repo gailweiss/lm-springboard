@@ -60,7 +60,7 @@ def sync_model_params(requested_model_params, loaded_model_params):
 
 
 def make_model_and_data(data_params, model_params, train_params,
-                        tokenizer=None, verbose=True):
+                        tokenizer=None, verbose=True, skip_data=False):
     if model_params.from_saved or (model_params.from_os_pretrained == "gpt2"):
         if model_params.from_saved:
             from model_explorer import get_model_by_timestamp
@@ -83,11 +83,13 @@ def make_model_and_data(data_params, model_params, train_params,
         model, tokenizer = lm.decoder, lm.tokenizer
         sync_model_params(model_params, lm.model_params)
 
-    tokenizer, dataset = make_tokenizer_and_data(data_params,
-                                                 model_params,
-                                                 train_params,
-                                                 existing_tokenizer=tokenizer,
-                                                 verbose=verbose)
+    if skip_data:
+        dataset = None
+        assert None is not tokenizer # make sure did receive one
+    else:
+        tokenizer, dataset = make_tokenizer_and_data(data_params,
+            model_params, train_params, existing_tokenizer=tokenizer,
+            verbose=verbose)
 
     if not model_params.from_os_pretrained:
         if "transformer" in model_params.layer_architecture:

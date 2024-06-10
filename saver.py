@@ -24,9 +24,12 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
     pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
 
 
-def load_model(folder_name, full=False, verbose=True):
+def load_model(folder_name, full=False, verbose=True, 
+               skip_data=False, known_tokenizer=None):
     # folder_name = path_join("../artifacts/models", folder_name)
     # not messing with folder paths anymore, i'll get the full path myself...
+    # only pass tokenizer if you know the correct one, it is only to save time
+    # by removing the need for this function to make/load it itself!
     if Path(folder_name).exists() is False:
         raise ValueError(f"Folder {folder_name} does not exist")
 
@@ -40,14 +43,17 @@ def load_model(folder_name, full=False, verbose=True):
     with open(path_join(folder_name, "train_stats.json"), "r") as f:
         train_stats = json.load(f)
 
-    tokenizer = load_stored_tokenizer_if_exists(
-        model_params.tokenizer_source_name, folder_name, verbose)
+    tokenizer = known_tokenizer
+    if None is tokenizer:
+        tokenizer = load_stored_tokenizer_if_exists(
+            model_params.tokenizer_source_name, folder_name, verbose)
 
     train_params.no_wandb = True  # no wandb in loaded models - or it will
     # try (unsuccessfully) to send validation losses to wandb when doing a
     # validation run
     lm, dataset = make_model_and_data(data_params, model_params, train_params,
-                                      tokenizer=tokenizer, verbose=verbose)
+                                      tokenizer=tokenizer, verbose=verbose,
+                                      skip_data=skip_data)
 
     model_trainer = Trainer.load_from_checkpoint(
                                 path_join(folder_name, "model.model"),

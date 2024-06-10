@@ -28,6 +28,41 @@ class Trainer(pl.LightningModule):
         self.automatic_optimization = False
         # gain more control of optimization - lightning automatic optimization
         # quite constrained in options
+        self.last_checkpoint_i = -1
+        self.last_checkpoint_nsamples = -1
+
+    def prepare_saver(self, dp, saving_folder, saving_function):
+        self.dp = dp
+        self.saving_folder = saving_folder
+        self.saving_function = saving_function
+
+    def save_checkpoint(self):
+        if self.n_train_samples == self.last_checkpoint_nsamples:
+            return # already saved this one, e.g. coming here from epoch end 
+            # after just having saved by other means
+        fn = f"{self.saving_folder}/{self.n_train_samples}"
+        self.saving_function(fn, self.trainer, self, self.model.model_params,
+                             self.dp, self.train_params)
+        self.last_checkpoint_nsamples = self.n_train_samples
+
+    def maybe_save_checkpoint(self, after_val=False, after_train_epoch=False):
+        if self.train_params.checkpoint_every == 0 or\
+           self.train_params.checkpoint_every < -1:
+            return # never checkpoints
+
+        if self.train_params.checkpoint_every > 0:
+            checkpoint_i = (self.n_train_samples // 
+                            self.train_params.checkpoint_every)
+            if checkpoint_i > self.last_checkpoint_i:
+                self.save_checkpoint()
+                self.last_checkpoint_i = checkpoint_i
+                return
+
+        if after_val and self.train_params.checkpoint_every == -1:
+            self.save_checkpoint()
+            return
+        if after_train_epoch:
+            self.save_checkpoint()
 
     def log_stat(self, name, val):
         if not self.train_params.no_wandb:
@@ -51,6 +86,7 @@ class Trainer(pl.LightningModule):
         for t, losses in self.curr_train_losses_by_type.items():
             self.log_stat(f"train_loss:{t}", sum(losses) / len(losses))
         self.curr_train_losses_by_type = {}
+        self.maybe_save_checkpoint(after_train_epoch=True)
 
     def on_validation_epoch_end(self):
         self.log_time()
@@ -74,6 +110,7 @@ class Trainer(pl.LightningModule):
                 print("couldn't print the sample here :(")
                 print(e)
             print("\n")
+        self.maybe_save_checkpoint(after_val=True)
 
     def record_type_losses(self, losses, recording_dict, from_train=False):
         # dont want to record losses with their graphs or anything
@@ -114,6 +151,7 @@ class Trainer(pl.LightningModule):
         if hasattr(torch, "mps"):
             torch.mps.empty_cache()
         self.maybe_log_hyperparams_and_time()
+        self.maybe_save_checkpoint()
 
         losses, n_samples = self.model.get_losses(batch)
         self.n_train_samples += n_samples
@@ -133,6 +171,7 @@ class Trainer(pl.LightningModule):
             opt.zero_grad()
             sched = self.lr_schedulers()
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
+
 
     def validation_step(self, batch, batch_idx):
         losses, n_samples = self.model.get_losses(batch)

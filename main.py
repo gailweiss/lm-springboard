@@ -119,19 +119,20 @@ def get_params(config_filename):
     return dp, tp, mp
 
 
-def train(args, lm, dataset, tp):
+def train(args, lm, dataset, tp, dp, saving_folder):
+    # dp and saving_folder are for saving checkpoints
     tokenizer = lm.tokenizer
     start_time = process_time()
     pltrainer = pl.Trainer(
-        enable_checkpointing=False, logger=False,
-        # checkpointing off to not make infinite log files and checkpoints,
-        # which i dont want
+        logger=False,
+        # logging off to not make infinite log files, which i dont want
         devices=1 if args.gpu_id is None else [args.gpu_id],  # only run on 1
         # device, else it runs all of main.py n_devices times (????).
         # presumably its for multi-gpu training but i haven't learned how yet
         max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
 
     mytrainer = Trainer(lm, tp, start_time=start_time)
+    mytrainer.prepare_saver(dp, saving_folder, save_model)
 
     pltrainer.fit(mytrainer, dataset.train_dataloader(tp.batch_size),
                   dataset.val_dataloader(tp.batch_size))
@@ -141,7 +142,8 @@ def train(args, lm, dataset, tp):
     # might not run a validation at the end of the last epoch, which will mess
     # up my saved stats and so make it hard to check a loaded model is behaving
     # as expected. so, explicitly run a final validation once training is done.
-    return lm, pltrainer, mytrainer
+    
+    return pltrainer
 
 
 def run_config(args, dp, tp, mp, namer):
@@ -166,16 +168,19 @@ def run_config(args, dp, tp, mp, namer):
         print_nicely_nested(full)
 
         lm, dataset = make_model_and_data(dp, mp, tp)
-        res = train(args, lm, dataset, tp)
+        saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
+        res = train(args, lm, dataset, tp, dp, saving_folder)
         if not isinstance(res, Exception):
-            lm, pltrainer, mytrainer = res
+            pltrainer = res
+            mytrainer = pltrainer.model
+            lm = mytrainer.model
             sample = lm.sample(max_seq_len=50, temperature=0.5)
             try:
                 print(sample)
             except Exception as e:
                 print("could not print this sample - got exception:\n", e)
             if args.save:
-                fn = f"../saved-models/{namer.save_folder_name(run_name)}"
+                fn = f"{saving_folder}/final"
                 # make sure to use the updated model params after all this
                 save_model(fn, pltrainer, mytrainer, lm.model_params, dp, tp)
                 print("saved model in:\n", fn)
@@ -253,6 +258,8 @@ def run_main(arg_bits_list=None):
         dp, tp, mp = get_params(filename)
         if None is not args.task:
             dp.dataset_name = args.task
+        if not args.save:
+            tp.checkpoint_every = 0
         for mpv in all_config_variants(mp):
             for tpv in all_config_variants(tp):
                 namer.set_config_index(config_index)
