@@ -85,11 +85,11 @@ def make_model_and_data(data_params, model_params, train_params,
 
     if skip_data:
         dataset = None
-        assert None is not tokenizer # make sure did receive one
+        assert None is not tokenizer  # make sure did receive one
     else:
-        tokenizer, dataset = make_tokenizer_and_data(data_params,
-            model_params, train_params, existing_tokenizer=tokenizer,
-            verbose=verbose)
+        tokenizer, dataset = make_tokenizer_and_data(
+            data_params, model_params, train_params,
+            existing_tokenizer=tokenizer, verbose=verbose)
 
     if not model_params.from_os_pretrained:
         if "transformer" in model_params.layer_architecture:

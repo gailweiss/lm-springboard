@@ -143,7 +143,7 @@ def train(args, lm, dataset, tp, dp, saving_folder):
     # might not run a validation at the end of the last epoch, which will mess
     # up my saved stats and so make it hard to check a loaded model is behaving
     # as expected. so, explicitly run a final validation once training is done.
-    
+
     return pltrainer
 
 

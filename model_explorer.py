@@ -27,10 +27,10 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True):
     for p in paths:
         desc = p.split("/")[-2]
         desc = "final" if desc == "final" else int(desc)
-        full = saver.load_model(p, full=True, verbose=verbose, 
+        full = saver.load_model(p, full=True, verbose=verbose,
                                 with_data=with_data)
         lm, dataset, train_stats = full[:3]
-        results[desc] = {"lm":lm, "train_stats":train_stats}
+        results[desc] = {"lm": lm, "train_stats": train_stats}
     return results
 
 

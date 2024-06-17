@@ -38,7 +38,7 @@ class Trainer(pl.LightningModule):
 
     def save_checkpoint(self):
         if self.n_train_samples == self.last_checkpoint_nsamples:
-            return # already saved this one, e.g. coming here from epoch end 
+            return  # already saved this one, e.g. coming here from epoch end
             # after just having saved by other means
         fn = f"{self.saving_folder}/{self.n_train_samples}"
         self.saving_function(fn, self.trainer, self, self.model.model_params,
@@ -48,10 +48,10 @@ class Trainer(pl.LightningModule):
     def maybe_save_checkpoint(self, after_val=False, after_train_epoch=False):
         if self.train_params.checkpoint_every == 0 or\
            self.train_params.checkpoint_every < -1:
-            return # never checkpoints
+            return  # never checkpoints
 
         if self.train_params.checkpoint_every > 0:
-            checkpoint_i = (self.n_train_samples // 
+            checkpoint_i = (self.n_train_samples //
                             self.train_params.checkpoint_every)
             if checkpoint_i > self.last_checkpoint_i:
                 self.save_checkpoint()
@@ -171,7 +171,6 @@ class Trainer(pl.LightningModule):
             opt.zero_grad()
             sched = self.lr_schedulers()
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
-
 
     def validation_step(self, batch, batch_idx):
         losses, n_samples = self.model.get_losses(batch)

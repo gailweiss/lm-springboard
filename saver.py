@@ -24,7 +24,7 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
     pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
 
 
-def load_model(folder_name, full=False, verbose=True, 
+def load_model(folder_name, full=False, verbose=True,
                with_data=False, known_tokenizer=None):
     # folder_name = path_join("../artifacts/models", folder_name)
     # not messing with folder paths anymore, i'll get the full path myself...
