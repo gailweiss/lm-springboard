@@ -124,8 +124,9 @@ def train(args, lm, dataset, tp, dp, saving_folder):
     tokenizer = lm.tokenizer
     start_time = process_time()
     pltrainer = pl.Trainer(
-        logger=False,
-        # logging off to not make infinite log files, which i dont want
+        logger=False, enable_checkpointing=False,
+        # logging and checkpointing off to not make infinite log and checkpoint
+        # files, which i dont want
         devices=1 if args.gpu_id is None else [args.gpu_id],  # only run on 1
         # device, else it runs all of main.py n_devices times (????).
         # presumably its for multi-gpu training but i haven't learned how yet
