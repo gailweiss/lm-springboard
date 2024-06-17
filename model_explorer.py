@@ -7,32 +7,30 @@ import torch
 from util import prepare_directory
 
 
-def get_model_by_timestamp(timestamp, verbose=True):
+def get_model_by_timestamp(timestamp, verbose=True, with_data=True):
     p = get_full_path(timestamp)
     if None is p:
         return None
 
-    full = saver.load_model(p, full=True, verbose=verbose)
+    full = saver.load_model(p, full=True, verbose=verbose, with_data=with_data)
     lm, dataset, train_stats = full[:3]
     mp, dp, tp = full[3:]
     params = {"model_params": mp, "data_params": dp, "train_params": tp}
     return lm, dataset, train_stats, params
 
 
-def get_all_checkpoints_by_timestamp(timestamp, verbose=True, skip_data=False):
+def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True):
     p_final = get_full_path(timestamp)
     p_containing = p_final[:-len("/final/")]
     paths = glob.glob(f"{p_containing}/*/")
     results = {}
-    tokenizer = None
     for p in paths:
         desc = p.split("/")[-2]
         desc = "final" if desc == "final" else int(desc)
         full = saver.load_model(p, full=True, verbose=verbose, 
-            skip_data=None is not tokenizer, known_tokenizer=tokenizer)
+                                with_data=with_data)
         lm, dataset, train_stats = full[:3]
         results[desc] = {"lm":lm, "train_stats":train_stats}
-        tokenizer = lm.tokenizer
     return results
 
 

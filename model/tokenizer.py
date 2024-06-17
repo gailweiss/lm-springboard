@@ -7,7 +7,7 @@ import json
 
 
 @timed
-def make_tokenizer(data, vocab_size=30, eos="[EOS]", bos="[BOS]", pad="[PAD]",
+def make_bpe_tokenizer(data, vocab_size=30, eos="[EOS]", bos="[BOS]", pad="[PAD]",
                    unk="[UNK]", verbose=False):
     # for now always BPE, not focusing on this
     tokenizer = tokenizers.Tokenizer(tokenizers.models.BPE(unk_token=unk))
@@ -25,37 +25,52 @@ def make_tokenizer(data, vocab_size=30, eos="[EOS]", bos="[BOS]", pad="[PAD]",
     return tokenizer
 
 
-def tokenizer_path(p):
+def tokenizer_file(p):
     return f"{p}/tokenizer.json"
 
 
 def _load_custom_tokenizer(path):
-    return PreTrainedTokenizerFast(tokenizer_file=tokenizer_path(path))
+    return PreTrainedTokenizerFast(tokenizer_file=tokenizer_file(path))
 
 
 def load_stored_tokenizer_if_exists(source_name, folder_name, verbose):
-    if source_name == "custom" or \
+    if (True in [source_name == n for n in ["custom", "char"]]) or \
        (True in [n in source_name for n in ["gpt2", "bert"]]):
         # parallel conditions to those of 'save' functions in MyTokenizer below
+        # TODO MyTokenizer loading char tokenizer
         return MyTokenizer(name=source_name, from_path=folder_name,
                            verbose_init=verbose)
     return None
 
 
-class CharTokenizer:
-    def __init__(self, data, verbose_init=False):
-        assert isinstance(data, list)
-        self.tokens = set()
-        for s in data:
-            self.tokens.update(list(s))
+class CharTokenizer: 
+    # made with the BertTokenizer function signatures my functions expect to 
+    # find
+    def __init__(self, data=None, verbose_init=False, from_dict=None):
         self.unk_token = "<unk>"
         self.pad_token = "<pad>"
         self.bos = "<bos>"
         self.eos = "<eos>"
         self.special_tokens = [self.unk_token, self.pad_token, self.bos,
-                               self.eos]
-        self.tokens.update(self.special_tokens)
-        self.id2tok = sorted(list(self.tokens))
+                               self.eos]        
+
+        if None is not from_dict:
+            id2tok = from_dict["id2tok"]
+        else:
+            id2tok = self.make_tokens(data)
+
+        self.finish_init(id2tok,verbose_init)
+
+    def make_tokens(self,data):
+        tokens = set()
+        assert isinstance(data, list)
+        for s in data:
+            tokens.update(list(s))
+        tokens.update(self.special_tokens)
+        return sorted(list(tokens))
+
+    def finish_init(self,id2tok,verbose_init):
+        self.id2tok = id2tok
         self.tok2id = {t: i for i, t in enumerate(self.id2tok)}
         self._pad_token_type_id = self.tok2id[self.pad_token]
         self.eos_token_id = self.tok2id[self.eos]
@@ -85,9 +100,12 @@ class CharTokenizer:
         tokens = self.convert_ids_to_tokens(ids)
         return "".join(tokens)
 
+    def save_dict(self):
+        return {"id2tok":self.id2tok}
+
 
 class BertTokenizerLike:
-    def __init__(self, data, custom_vocab_size=30,
+    def __init__(self, data=None, custom_vocab_size=30,
                  from_path=None, from_gpt2tokenizer=None, verbose_init=False):
         if from_gpt2tokenizer:
             self.internal = from_gpt2tokenizer
@@ -97,7 +115,7 @@ class BertTokenizerLike:
             if from_path:
                 self.internal = _load_custom_tokenizer(from_path)
             else:
-                self.internal = make_tokenizer(data,
+                self.internal = make_bpe_tokenizer(data,
                                                vocab_size=custom_vocab_size,
                                                eos='[EOS]', bos='[BOS]',
                                                pad='[PAD]',
@@ -134,117 +152,125 @@ class BertTokenizerLike:
                                     skip_special_tokens=skip_special_tokens)
 
 
+def getBertLikeTokenizer(name, data=None, custom_vocab_size=30, 
+                         verbose_init=False):
+    if name == "char":
+        return CharTokenizer(data, verbose_init=verbose_init)
+    if name == "custom":
+        return BertTokenizerLike(data=data, 
+                                 custom_vocab_size=custom_vocab_size,
+                                 verbose_init=verbose_init)
+    if "gpt2" in name:
+        gpt2tok = GPT2Tokenizer.from_pretrained(name)
+        return BertTokenizerLike(from_gpt2tokenizer=gpt2tok, 
+                                 verbose_init=verbose_init)
+    if "bert" in name:
+        res = BertTokenizer.from_pretrained(name)
+        res.add_tokens(["\n"]) # i want this and its annoying it doesnt have it
+        return res
+    print("\n\n!!unrecognised tokenizer name!:", self.name)
+
+
 class MyTokenizer:
     def __init__(self, data=None, name="bert-base-uncased",
                  custom_vocab_size=30, from_path=None, verbose_init=False,
                  no_crop=False):
         self.masking_cropped = False
-        self.no_crop = no_crop
-        self.name = name
-        self.from_path = from_path
         self.verbose_init = verbose_init
-        if from_path:
-            with open(tokenizer_path(from_path), "r") as f:
-                core = json.load(f)
-            if isinstance(core, dict) and \
-               (core.get("type", None) == "from_pretrained"):
-                self.name = core["name"]
-                self.no_crop = core["no_crop"]
-                if not self.no_crop:
-                    self.ids_self2tokenizer = core["ids_self2tokenizer"]
-                # no return - not done - will be using these to complete setup
-            else:
-                self.tokenizer = BertTokenizerLike(None, from_path=from_path,
-                                                   verbose_init=verbose_init)
-                self.pad_token_id = self.tokenizer._pad_token_type_id
-                return  # done
-
-        if self.name == "char":
-            self.tokenizer = CharTokenizer(data, verbose_init=verbose_init)
-            self.pad_token_id = self.tokenizer._pad_token_type_id
-
-        elif self.name == "custom":
-            self.tokenizer = BertTokenizerLike(
-                data, custom_vocab_size=custom_vocab_size,
-                verbose_init=verbose_init)
-            self.pad_token_id = self.tokenizer._pad_token_type_id
-
-        elif "gpt2" in self.name:
-            gpt2tok = GPT2Tokenizer.from_pretrained(self.name)
-            self.tokenizer = BertTokenizerLike(data,
-                                               from_gpt2tokenizer=gpt2tok,
-                                               verbose_init=verbose_init)
-            self._crop_from(data)
-            self.pad_token_id = self.tokenizer._pad_token_type_id
-
-        elif "bert" in self.name:  # eg bert-base-uncased
-            self.tokenizer = BertTokenizer.from_pretrained(name)
-            self.tokenizer.add_tokens(["\n"])
-            self._crop_from(data)
-            self.pad_token_id = self.tokenizer._pad_token_type_id
-            # the trainer needs this (the ignored value) for the cross
-            # entropy calculation
+        if None is not from_path:
+            self.init_from_path(from_path)
         else:
-            print("\n\n!!unrecognised tokenizer name!:", self.name)
+            self.no_crop = no_crop
+            self.name = name
+            self.is_from_HF = True in [n in name for n in ["gpt2", "bert"]]
+            self.tokenizer = getBertLikeTokenizer(name, data=data, 
+                custom_vocab_size=custom_vocab_size, verbose_init=verbose_init)
+            if self.is_from_HF:
+                self.prepare_crop(data)
+                self.apply_crop()
+        self.pad_token_id = self.tokenizer._pad_token_type_id
+        # the trainer needs this (the ignored value) for the cross
+        # entropy calculation        
+
+    def init_from_path(self, path):
+        with open(tokenizer_file(path), "r") as f:
+            core = json.load(f)
+        if isinstance(core, dict) and core.get("core-dict",False):
+            self.name = core["name"]
+            self.is_from_HF = core["is_from_HF"]
+            self.no_crop = core["no_crop"]
+            self.masking_cropped = core["masking_cropped"]
+            if self.is_from_HF:
+                self.tokenizer =getBertLikeTokenizer(self.name)
+                if self.masking_cropped:
+                    self.ids_self2tokenizer = core["ids_self2tokenizer"]
+                    self.v_orig = core["v_orig"]
+                    self.apply_crop()
+            elif self.name == "char":
+                self.tokenizer = CharTokenizer(from_dict=core["tokenizer-dict"])
+        else: # used custom tokenizer internal save
+            self.name = "custom"
+            self.tokenizer = BertTokenizerLike(from_path=path,
+                                               verbose_init=self.verbose_init)
 
     def save(self, path):
         if self.name == "custom":
-            self.tokenizer.internal.save(full_path(path))
-        elif True in [n in self.name for n in ["gpt2", "bert"]]:
-            core = {"name": self.name,
+            self.tokenizer.internal.save(tokenizer_file(path))
+            return
+        elif self.is_from_HF or (self.name == "char"):
+            core = {"core-dict": True,
+                    "name": self.name, 
+                    "is_from_HF": self.is_from_HF,
                     "no_crop": self.no_crop,
-                    "type": "from_pretrained"}
+                    "masking_cropped": self.masking_cropped}
+            if self.name == "char":
+                core["tokenizer-dict"] = self.tokenizer.save_dict()
+                core["core-dict"] = True
             if self.masking_cropped:
                 core["ids_self2tokenizer"] = self.ids_self2tokenizer
-            with open(tokenizer_path(path), "w") as f:
-                json.dump(core, f)
-        elif self.from_path:  # if for some reason making a copy somewhere else
-            with open(full_path(self.from_path), "r") as f:
-                j = f.readlines()
-            with open(full_path(path), "w") as f:
-                f.writelines(j)
+                core["v_orig"] = self.v_orig
+            with open(tokenizer_file(path), "w") as f:
+                json.dump(core,f)                
         else:
-            pass  # dont need to save bert/gpt2 types - theyre online
+            print("\n\n!!unrecognised tokenizer!:", self.name,
+                  "\n - not saved in path",path)
 
     @timed
-    def _crop_from(self, data):
+    def prepare_crop(self,data):
         # data: list of inputs, eg ["hi","i am a sample"]
         if self.no_crop:
             return
-        v_orig = self.vocab_size()
+        self.v_orig = self.vocab_size()
+
+        actual_used_ids = set()
+        jump = 50
+        therange = range(0, len(data), jump)
+        therange = tqdm(therange) if self.verbose_init else therange
+        for i in therange:
+            b = data[i: i + jump]
+            t = self(b)
+            for tok_id in t:
+                actual_used_ids.update(tok_id)
+        # make sure these get in
+        actual_used_ids.update([self.tokenizer.unk_token_id,
+                                self.tokenizer._pad_token_type_id])
+
+        self.ids_self2tokenizer = sorted(list(actual_used_ids))
+
+    def apply_crop(self):
         if self.verbose_init:
-            print("vocab size before cropping tokenizer:", self.vocab_size())
+            print("vocab size before cropping tokenizer:", self.v_orig)
 
-        def get_used_ids():
-            if self.from_path:  # i.e. loaded from somewhere - already have the
-                # correct ids!
-                return self.ids_self2tokenizer
-            actual_used_ids = set()
-            jump = 50
-            if self.verbose_init:
-                print("cropping tokenizer")
-            therange = range(0, len(data), jump)
-            therange = tqdm(therange) if self.verbose_init else therange
-            for i in therange:
-                b = data[i: i + jump]
-                t = self(b)
-                for tok_id in t:
-                    actual_used_ids.update(tok_id)
-            # make sure these get in
-            actual_used_ids.update([self.tokenizer.unk_token_id,
-                                    self.tokenizer._pad_token_type_id])
-            return actual_used_ids
-
-        self.ids_self2tokenizer = sorted(list(get_used_ids()))
         self.ids_tokenizer2self = {t: s for s, t in
                                    enumerate(self.ids_self2tokenizer)}
         self._unk_id = self.ids_tokenizer2self[self.tokenizer.unk_token_id]
         self._pad_token_type_id = \
             self.ids_tokenizer2self[self.tokenizer._pad_token_type_id]
         self.masking_cropped = True
+
         if self.verbose_init:
             print("vocab size after cropping tokenizer:", self.vocab_size())
-            print("num tokens cropped:", v_orig - self.vocab_size())
+            print("num tokens cropped:", self.v_orig - self.vocab_size())
 
     def get_vocab(self):
         r = self.tokenizer.get_vocab()  # gives {tok:id} dict

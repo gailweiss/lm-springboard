@@ -25,7 +25,7 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
 
 
 def load_model(folder_name, full=False, verbose=True, 
-               skip_data=False, known_tokenizer=None):
+               with_data=False, known_tokenizer=None):
     # folder_name = path_join("../artifacts/models", folder_name)
     # not messing with folder paths anymore, i'll get the full path myself...
     # only pass tokenizer if you know the correct one, it is only to save time
@@ -53,7 +53,8 @@ def load_model(folder_name, full=False, verbose=True,
     # validation run
     lm, dataset = make_model_and_data(data_params, model_params, train_params,
                                       tokenizer=tokenizer, verbose=verbose,
-                                      skip_data=skip_data)
+                                      skip_data=not with_data)
+    # if with_data==False, will receive None for dataset
 
     model_trainer = Trainer.load_from_checkpoint(
                                 path_join(folder_name, "model.model"),
