@@ -200,7 +200,7 @@ def run_config(args, dp, tp, mp, namer):
                 print("couldnt delete wandb log at:", run_loc,
                       " -- got exception:\n", e)
     _run_config()
-    if hasattr(torch, "mps"):
+    if hasattr(torch, "mps") and torch.backends.mps.is_available():
         torch.mps.empty_cache()
 
 

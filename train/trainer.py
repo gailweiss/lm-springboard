@@ -148,7 +148,7 @@ class Trainer(pl.LightningModule):
 
         if torch.cuda.is_available:
             torch.cuda.empty_cache()
-        if hasattr(torch, "mps"):
+        if hasattr(torch, "mps") and torch.backends.mps.is_available():
             torch.mps.empty_cache()
         self.maybe_log_hyperparams_and_time()
         self.maybe_save_checkpoint()
