@@ -32,6 +32,8 @@ class LM(nn.Module):
     def _sample(self, indices, max_seq_len, temperature, top_k, nucleus):
         eos = self.tokenizer.eos()
 
+        max_seq_len = min(max_seq_len, self.model_params.max_seq_len)
+
         def stop(indices):
             if len(indices) >= max_seq_len:
                 return True
