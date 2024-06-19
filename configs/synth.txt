@@ -6,7 +6,7 @@ batch_size = 32
 accumulate_grad_batches = 1
 epochs = 2
 lr = 1e-3
-max_sample_tokens: int = 200
+max_sample_tokens = 200
 warm_steps = 100
 lr_cycle_steps=500
 
