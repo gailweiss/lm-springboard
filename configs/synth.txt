@@ -2,20 +2,20 @@ DataParams
 
 TrainParams
 
-batch_size = 4
-accumulate_grad_batches = 8
-lr = 1e-3
-patience = 50
-scheduler_factor = 0.99
-warm_steps = 100
+batch_size = 32
+accumulate_grad_batches = 1
 epochs = 2
+lr = 1e-3
+max_sample_tokens: int = 200
+warm_steps = 100
+lr_cycle_steps=500
+
 
 
 ModelParams
 
-n_layers = 2
-n_heads = 2
-dim = 64
+n_layers = 3
+n_heads = 4
+dim = 256
 max_seq_len = 200
-custom_tokenizer_ntokens = 2000
 tokenizer_source_name = "char" 
