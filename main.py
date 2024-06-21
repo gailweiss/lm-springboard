@@ -10,7 +10,7 @@ import argparse
 from dataclasses import asdict
 import wandb
 from util import get_timestamp, print_nicely_nested, in_try
-from saver import save_model
+from saver import save_model as save_model_
 from create import make_model_and_data
 import shutil
 from copy import deepcopy
@@ -147,59 +147,70 @@ def train(args, lm, dataset, tp, dp, saving_folder):
     return pltrainer
 
 
+def setup_wandb(args, tp, full_params, namer):
+    if not (tp.no_wandb or args.no_wandb):
+        run = wandb.init(entity=wandb_username,
+                         project=namer.wandb_proj_name(),
+                         config=full_params, name=namer.run_name(), dir="..")
+        wandb.define_metric("n_train_samples")
+        wandb.define_metric("*", step_metric="n_train_samples")
+        wandb.log({"n_train_samples": 0})
+        run_name = run.name  # if namer sends nothing then wandb makes one
+        run_loc = run.dir
+        assert run_loc.endswith("/files")
+        run_loc = run_loc[:-len("/files")]
+    else:
+        run, run_loc = None, None
+        run_name = namer.run_name()
+    return run, run_name, run_loc
+
+
+def finish_wandb(args, tp, run, run_loc):
+    if not (tp.no_wandb or args.no_wandb):
+        run.finish()
+        current_year = "2024"
+        # honestly fine with failing this once a year just to be sure this
+        # delete is still fine
+        assert run_loc.split("/")[-1].startswith(f'run-{current_year}')
+        sleep(10)  # give wandb 10 seconds to actually finish, this is
+        # stupid but ugh i guess
+        try:
+            shutil.rmtree(run_loc)
+        except Exception as e:
+            print("couldnt delete wandb log at:", run_loc,
+                  " -- got exception:\n", e)
+
+
+def show_sample(lm):
+    sample = lm.sample(max_seq_len=50, temperature=0.5)
+    try:
+        print(sample)
+    except Exception as e:
+        print("could not print this sample - got exception:\n", e)
+
+
+def save_model(args, saving_folder, pltrainer, dp, tp):
+    mytrainer = pltrainer.model
+    lm = mytrainer.model
+    if args.save:
+        fn = f"{saving_folder}/final"
+        # make sure to use the updated model params after all this
+        save_model_(fn, pltrainer, mytrainer, lm.model_params, dp, tp)
+        print("saved model in:\n", fn)
+
+
 def run_config(args, dp, tp, mp, namer):
-    def _run_config():
-        full = build_full(dp, tp, mp)
-        if not (tp.no_wandb or args.no_wandb):
-            run = wandb.init(entity=wandb_username,
-                             project=namer.wandb_proj_name(),
-                             config=full, name=namer.run_name(), dir="..")
-            wandb.define_metric("n_train_samples")
-            wandb.define_metric("*", step_metric="n_train_samples")
-            wandb.log({"n_train_samples": 0})
-            run_name = run.name  # if namer sends nothing then wandb makes one
-            run_loc = run.dir
-            assert run_loc.endswith("/files")
-            run_loc = run_loc[:-len("/files")]
-        else:
-            run_name = namer.run_name()
-            run_loc = None
-        print("going to train from config: [", args.config,
-              "], using the following parameters:")
-        print_nicely_nested(full)
-
-        lm, dataset = make_model_and_data(dp, mp, tp)
-        saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
-        res = train(args, lm, dataset, tp, dp, saving_folder)
-        if not isinstance(res, Exception):
-            pltrainer = res
-            mytrainer = pltrainer.model
-            lm = mytrainer.model
-            sample = lm.sample(max_seq_len=50, temperature=0.5)
-            try:
-                print(sample)
-            except Exception as e:
-                print("could not print this sample - got exception:\n", e)
-            if args.save:
-                fn = f"{saving_folder}/final"
-                # make sure to use the updated model params after all this
-                save_model(fn, pltrainer, mytrainer, lm.model_params, dp, tp)
-                print("saved model in:\n", fn)
-
-        if not (tp.no_wandb or args.no_wandb):
-            run.finish()
-            current_year = "2024"
-            # honestly fine with failing this once a year just to be sure this
-            # delete is still fine
-            assert run_loc.split("/")[-1].startswith(f'run-{current_year}')
-            sleep(10)  # give wandb 10 seconds to actually finish, this is
-            # stupid but ugh i guess
-            try:
-                shutil.rmtree(run_loc)
-            except Exception as e:
-                print("couldnt delete wandb log at:", run_loc,
-                      " -- got exception:\n", e)
-    _run_config()
+    full_params = build_full(dp, tp, mp)
+    run, run_name, run_loc = setup_wandb(args, tp, full_params, namer)
+    print("going to train from config: [", args.config,
+          "], using the following parameters:")
+    print_nicely_nested(full_params)
+    lm, dataset = make_model_and_data(dp, mp, tp)
+    saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
+    pltrainer = train(args, lm, dataset, tp, dp, saving_folder)
+    show_sample(pltrainer.model.model)
+    save_model(args, saving_folder, pltrainer, dp, tp)
+    finish_wandb(args, tp, run, run_loc)
     if hasattr(torch, "mps") and torch.backends.mps.is_available():
         torch.mps.empty_cache()
 
