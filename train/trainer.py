@@ -141,27 +141,27 @@ class Trainer(pl.LightningModule):
         freq = self.train_params.hyperparams_log_freq
         if self.curr_steps_count % freq == 0:
             self.log_hyperparams_and_time()
-
+        
     def training_step(self, batch, batch_idx):
         self.curr_steps_count += 1
         self.this_lm_total_batches += 1
-
-        if torch.cuda.is_available:
-            torch.cuda.empty_cache()
-        if hasattr(torch, "mps") and torch.backends.mps.is_available():
-            torch.mps.empty_cache()
         self.maybe_log_hyperparams_and_time()
         self.maybe_save_checkpoint()
+        clear_gpu_caches()
 
         losses, n_samples = self.model.get_losses(batch)
         self.n_train_samples += n_samples
+
         self.record_type_losses(losses, self.curr_train_losses_by_type,
                                 from_train=True)
-        main_loss = losses["main"]
-        self.log("train_batch_loss", main_loss.item())  # for the lr scheduler
+        self.log("train_batch_loss", losses["main"].item())  # for the lr scheduler
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
-        self.manual_backward(main_loss)
+
+        self.manual_backward(losses["main"])
+        self.maybe_step_opt_and_lr(batch_idx)
+
+    def maybe_step_opt_and_lr(self, batch_idx):
         if (batch_idx + 1) % self.train_params.accumulate_grad_batches == 0:
             opt = self.optimizers()
             self.clip_gradients(
@@ -258,3 +258,9 @@ class MyChainedScheduler:
 
     def load_state_dict(self):
         return self.get_curr_scheduler().load_state_dict()
+
+def clear_gpu_caches():
+    if torch.cuda.is_available:
+        torch.cuda.empty_cache()
+    if hasattr(torch, "mps") and torch.backends.mps.is_available():
+        torch.mps.empty_cache()
