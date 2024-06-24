@@ -184,7 +184,7 @@ class MyTokenizer:
             self.tokenizer = getBertLikeTokenizer(
                 name, data=data, custom_vocab_size=custom_vocab_size,
                 verbose_init=verbose_init)
-            if self.is_from_HF:
+            if self.is_from_HF and not self.no_crop:
                 self.prepare_crop(data)
                 self.apply_crop()
         self.pad_token_id = self.tokenizer._pad_token_type_id
@@ -238,8 +238,6 @@ class MyTokenizer:
     @timed
     def prepare_crop(self, data):
         # data: list of inputs, eg ["hi","i am a sample"]
-        if self.no_crop:
-            return
         self.v_orig = self.vocab_size()
 
         actual_used_ids = set()
