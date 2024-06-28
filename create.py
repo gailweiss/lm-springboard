@@ -107,9 +107,11 @@ def make_model_and_data(data_params, model_params, train_params,
     return lm, dataset
 
 
-def quick_data_grab(dataset_name, existing_tokenizer=None):
+def quick_data_grab(dataset_name, tokenizer_source_name="gpt2",
+                    existing_tokenizer=None, verbose=False):
     dp = DataParams(dataset_name=dataset_name, debug_crop=500)
-    mp = ModelParams()
+    mp = ModelParams(tokenizer_source_name=tokenizer_source_name)
     tp = TrainParams()
     return make_tokenizer_and_data(dp, mp, tp,
-                                   existing_tokenizer=existing_tokenizer)
+                                   existing_tokenizer=existing_tokenizer,
+                                   verbose=verbose)
