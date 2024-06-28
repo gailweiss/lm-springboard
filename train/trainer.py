@@ -141,7 +141,7 @@ class Trainer(pl.LightningModule):
         freq = self.train_params.hyperparams_log_freq
         if self.curr_steps_count % freq == 0:
             self.log_hyperparams_and_time()
-        
+
     def training_step(self, batch, batch_idx):
         self.curr_steps_count += 1
         self.this_lm_total_batches += 1
@@ -154,7 +154,8 @@ class Trainer(pl.LightningModule):
 
         self.record_type_losses(losses, self.curr_train_losses_by_type,
                                 from_train=True)
-        self.log("train_batch_loss", losses["main"].item())  # for the lr scheduler
+        self.log("train_batch_loss", losses["main"].item())
+        # for the lr scheduler
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
 
@@ -258,6 +259,7 @@ class MyChainedScheduler:
 
     def load_state_dict(self):
         return self.get_curr_scheduler().load_state_dict()
+
 
 def clear_gpu_caches():
     if torch.cuda.is_available:

@@ -144,7 +144,7 @@ class BertTokenizerLike:
 
     def convert_ids_to_tokens(self, ids):
         if not hasattr(self.internal, "convert_ids_to_tokens"):
-            # tokenizers.Tokenizer doesn't have this attribute, but it does 
+            # tokenizers.Tokenizer doesn't have this attribute, but it does
             # have id_to_token
             return [self.internal.id_to_token(i) for i in ids]
         return self.internal.convert_ids_to_tokens(ids)
