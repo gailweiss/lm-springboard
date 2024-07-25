@@ -179,13 +179,13 @@ class Trainer(pl.LightningModule):
         return losses["main"].item()
 
     def make_main_scheduler(self, optimizer):
-        if self.train_params.scheduler_type == 'Plateau':
+        if self.train_params.lr_scheduler_type == 'Plateau':
             sched = torch.optim.lr_scheduler.ReduceLROnPlateau
             return sched(optimizer, mode='min', verbose=False,
                          min_lr=self.train_params.min_lr,
                          factor=self.train_params.scheduler_factor,
                          patience=self.train_params.patience)
-        elif self.train_params.scheduler_type == 'Cyclic':
+        elif self.train_params.lr_scheduler_type == 'Cyclic':
             sched = torch.optim.lr_scheduler.CyclicLR
             return sched(optimizer, base_lr=self.train_params.min_lr,
                          max_lr=self.train_params.lr,
@@ -193,13 +193,13 @@ class Trainer(pl.LightningModule):
                          mode='triangular',
                          gamma=self.train_params.scheduler_factor,
                          cycle_momentum=False)
-        elif self.train_params.scheduler_type == 'Cosine':
+        elif self.train_params.lr_scheduler_type == 'Cosine':
             sched = torch.optim.lr_scheduler.CosineAnnealingLR
             return sched(optimizer, self.train_params.lr_cycle_steps,
                          eta_min=self.train_params.min_lr)
         else:
             raise Exception("unknown scheduler type:",
-                            self.train_params.scheduler_type)
+                            self.train_params.lr_scheduler_type)
 
     def reconfigure_optimizers(self):
         optimizers, _ = self.configure_optimizers(
@@ -211,15 +211,15 @@ class Trainer(pl.LightningModule):
                                      lr=self.train_params.lr)
 
         def f_warmup(n):
-            assert n <= self.train_params.warm_steps
-            return n / self.train_params.warm_steps
+            assert n <= self.train_params.lr_warm_steps
+            return n / self.train_params.lr_warm_steps
 
         s_warmup = torch.optim.lr_scheduler.LambdaLR(optimizer, f_warmup)
         s_main = self.make_main_scheduler(optimizer)
         s_full = MyChainedScheduler() if None is existing_scheduler else \
             existing_scheduler
         s_full.setup(optimizer, [s_warmup, s_main],
-                     milestones=[self.train_params.warm_steps])
+                     milestones=[self.train_params.lr_warm_steps])
         # get scheduler started, else first batch has max value apparently
         s_full.step(None)
         s_main = {"scheduler": s_full}

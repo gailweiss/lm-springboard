@@ -14,8 +14,8 @@ class TrainParams:
     no_wandb: bool = False
     hyperparams_log_freq: int = 100
     lr: float = 1e-3
-    warm_steps: int = 50
-    scheduler_type: str = 'Cosine'
+    lr_warm_steps: int = 50
+    lr_scheduler_type: str = 'Cosine'
     min_lr: float = 1e-7
     scheduler_factor: float = 0.995
     patience: int = 10
@@ -60,7 +60,7 @@ class TrainParams:
 # lr:
 #   Defines the 'main' learning rate, see different scheduler types for
 #   details.
-# warm_steps:
+# lr_warm_steps:
 #   Number of batches for which to warm up the learning rate before moving to
 #   the main scheduler. In this phase, the learning rate will increase linearly
 #   from 0 to lr
