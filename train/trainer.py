@@ -10,8 +10,8 @@ class Trainer(pl.LightningModule):
         super().__init__()
         self.model = model
         self.train_params = train_params
-        self.curr_train_losses_by_type = {}
-        self.curr_val_losses_by_type = {}
+        self.curr_train_stats_by_type = {"loss": {}, "acc": {}}
+        self.curr_val_stats_by_type = {"loss": {}, "acc": {}}
         self.curr_steps_count = 0
         self.this_lm_total_batches = 0
         self.start_time = start_time  # should be obtained with process_time()
@@ -82,18 +82,28 @@ class Trainer(pl.LightningModule):
             self.log_stat("process_time", process_time() - self.start_time)
 
     def on_train_epoch_end(self):
+        # note that averaging accs will give "average batch accuracy" but not
+        # actual full dataset accuracy (as batches may have different numbers
+        # of tokens)
         self.log_time()
-        for t, losses in self.curr_train_losses_by_type.items():
-            self.log_stat(f"train_loss:{t}", sum(losses) / len(losses))
-        self.curr_train_losses_by_type = {}
+        for sn in self.curr_train_stats_by_type:
+            d = self.curr_train_stats_by_type[sn]
+            for t, stats in d.items():
+                self.log_stat(f"train_{sn}:{t}", sum(stats) / len(stats))
+            self.curr_train_stats_by_type[sn] = {}
         self.maybe_save_checkpoint(after_train_epoch=True)
 
     def on_validation_epoch_end(self):
+        # note that averaging accs will give "average batch accuracy" but not
+        # actual full dataset accuracy (as batches may have different numbers
+        # of tokens)
         self.log_time()
-        for t, losses in self.curr_val_losses_by_type.items():
-            self.log_stat(f"val_loss:{t}", sum(losses) / len(losses))
-        main = self.curr_val_losses_by_type["main"]
-        self.curr_val_losses_by_type = {}
+        main = self.curr_val_stats_by_type["loss"]["main"]
+        for sn in self.curr_val_stats_by_type:
+            d = self.curr_val_stats_by_type[sn]
+            for t, stats in d.items():
+                self.log_stat(f"val_{sn}:{t}", sum(stats) / len(stats))
+            self.curr_val_stats_by_type[sn] = {}
 
         val_loss = sum(main) / len(main)
         self.last_val_loss = val_loss  # might want this e.g. in model_explorer
@@ -112,20 +122,23 @@ class Trainer(pl.LightningModule):
             print("\n")
         self.maybe_save_checkpoint(after_val=True)
 
-    def record_type_losses(self, losses, recording_dict, from_train=False):
-        # dont want to record losses with their graphs or anything
-        def item(loss):
-            if isinstance(loss, torch.Tensor):
-                return loss.item()
-
-        for t in losses:
-            if t not in recording_dict:
-                recording_dict[t] = [item(losses[t])]
+    def record_type_stats(self, stats, recording_dict, from_train=False,
+                          stat_name="loss"):
+        # dont want to record losses with their graphs
+        def item(v):
+            if isinstance(v, torch.Tensor):
+                return v.item()
             else:
-                recording_dict[t].append(item(losses[t]))
+                return v
+
+        for t in stats:
+            if t not in recording_dict:
+                recording_dict[t] = [item(stats[t])]
+            else:
+                recording_dict[t].append(item(stats[t]))
         if from_train:
-            for t in losses:
-                self.log_stat(f"train_batch_loss:{t}", item(losses[t]))
+            for t in stats:
+                self.log_stat(f"train_batch_{stat_name}:{t}", item(stats[t]))
 
     def curr_avg_lr(self):
         lrs = [pg['lr'] for pg in self.lr_schedulers().optimizer.param_groups]
@@ -149,11 +162,14 @@ class Trainer(pl.LightningModule):
         self.maybe_save_checkpoint()
         clear_gpu_caches()
 
-        losses, n_samples = self.model.get_losses(batch)
+        la, n_samples = self.model.get_losses(batch, accs_too=True)
+        losses, accs = la["loss"], la["acc"]
         self.n_train_samples += n_samples
 
-        self.record_type_losses(losses, self.curr_train_losses_by_type,
-                                from_train=True)
+        for sn in ["loss", "acc"]:
+            self.record_type_stats(la[sn], self.curr_train_stats_by_type[sn],
+                                   from_train=True, stat_name=sn)
+
         self.log("train_batch_loss", losses["main"].item())
         # for the lr scheduler
         self.log_stat("avg_lr", self.curr_avg_lr())
@@ -174,9 +190,11 @@ class Trainer(pl.LightningModule):
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
 
     def validation_step(self, batch, batch_idx):
-        losses, n_samples = self.model.get_losses(batch)
-        self.record_type_losses(losses, self.curr_val_losses_by_type)
-        return losses["main"].item()
+        la, n_samples = self.model.get_losses(batch, accs_too=True)
+        for sn in ["loss", "acc"]:
+            self.record_type_stats(la[sn], self.curr_val_stats_by_type[sn],
+                                   stat_name=sn)
+        return la["loss"]["main"].item()
 
     def make_main_scheduler(self, optimizer):
         if self.train_params.lr_scheduler_type == 'Plateau':

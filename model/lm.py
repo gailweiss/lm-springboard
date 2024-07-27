@@ -141,11 +141,19 @@ class LM(nn.Module):
         z = self(x)["logits"]
         return x, y, z
 
-    def get_losses(self, batch, loss_requests=None):
+    def get_losses(self, batch, loss_requests=None, accs_too=False):
         x, y, z = self.get_batch_xyz(batch, loss_requests=loss_requests)
-        main_loss = self.celoss(z.view(-1, self.n_tokens), y.reshape(-1))
+        z, y = z.view(-1, self.n_tokens), y.reshape(-1)
+        main_loss = self.celoss(z, y)
         losses = {"main": main_loss}
-        return losses, x.shape[0]  # num samples
+        if accs_too:
+            y_mask = y != self.ignore_index
+            z_match = z.argmax(dim=-1) == y
+            correct = torch.logical_and(z_match, y_mask).sum()
+            count = y_mask.sum()
+            accs = {"main": (correct / count).item()}
+        res = {"loss": losses, "acc": accs} if accs_too else losses
+        return res, x.shape[0]  # num samples
 
     def batch_perplexities(self, batch, before_exp=False):
         x, y, z = self.get_batch_xyz(batch)
