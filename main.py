@@ -133,7 +133,7 @@ def train(args, lm, dataset, tp, dp, saving_folder):
         max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
 
     mytrainer = Trainer(lm, tp, start_time=start_time)
-    mytrainer.prepare_saver(dp, saving_folder, save_model)
+    mytrainer.prepare_saver(dp, saving_folder, save_model_)
 
     pltrainer.fit(mytrainer, dataset.train_dataloader(tp.batch_size),
                   dataset.val_dataloader(tp.batch_size))
