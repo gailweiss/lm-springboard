@@ -13,6 +13,7 @@ import multiprocessing
 import torch
 from datetime import datetime
 from functools import reduce
+import glob
 
 
 class GlobalTimingDepth:
@@ -189,3 +190,14 @@ def get_parent_module(module, full_param_name):
 def get_nested_param(module, full_param_name):
     names = full_param_name.split(".")
     return reduce(getattr, names, module)
+
+
+def glob_nosquares(p):
+    # glob interprets pair of square brackets as describing range of tokens,
+    # so cannot directly glob a filename with square bracket pairs in it.
+    # but can turn each [ and ] into the range containing only [ or ], i.e.
+    # [[] and []]. use § as mediator in replace operation to avoid unwanted
+    # applications in second replace
+    p = p.replace("[","§[§").replace("]","§]§")
+    p = p.replace("§[§","[[]").replace("§]§","[]]")
+    return glob.glob(p)

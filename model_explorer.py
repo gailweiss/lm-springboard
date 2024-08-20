@@ -4,10 +4,12 @@ import glob
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from util import prepare_directory, get_timestamp
+from util import prepare_directory, get_timestamp, glob_nosquares
 import sys
 
+
 get_model_cache = {}
+
 
 def get_model_by_timestamp(timestamp, verbose=True, with_data=True, cache=False):
     if cache and (timestamp in get_model_cache):
@@ -26,16 +28,19 @@ def get_model_by_timestamp(timestamp, verbose=True, with_data=True, cache=False)
         get_model_cache[timestamp] = res
     return res
 
+
 get_checkpoints_cache = {}
+
 
 def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
                                      cache=False):
-    if cache and (timestamp in get_checkpoints_cache):
-        return get_checkpoints_cache[timestamp]
+    identifier = (timestamp, with_data)
+    if cache and (identifier in get_checkpoints_cache):
+        return get_checkpoints_cache[identifier]
 
     p_final = get_full_path(timestamp)
     p_containing = p_final[:-len("/final/")]
-    paths = glob.glob(f"{p_containing}/*/")
+    paths = glob_nosquares(f"{p_containing}/*/")
     results = {"models":{}}
     for p in paths:
         desc = p.split("/")[-2]
@@ -47,6 +52,7 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
             train_stats.get("train_batch_loss:main",[[0]])[-1][0]
             # if not got, then this is the model at time 0 - no training yet
         results["models"][desc] = {"lm": lm, "train_stats": train_stats}
+
         if "params" not in results:
             if with_data:
                 results["dataset"] = dataset
@@ -54,7 +60,7 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
                                  "data_params": full[4],
                                  "train_params": full[5]}
     if cache:
-        get_checkpoints_cache[timestamp] = results
+        get_checkpoints_cache[identifier] = results
     return results
 
 
@@ -201,7 +207,7 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None,
 
 def show_head_progress(timestamp, x, l, h, cache=True, store=False):
     res = get_all_checkpoints_by_timestamp(timestamp,
-        verbose=False, cache=cache)
+        verbose=False, cache=cache, with_data=False)
     
     task_name = res["params"]["data_params"].dataset_name
     alphabet = list(res["models"][0]["lm"].tokenizer.get_vocab().keys())
