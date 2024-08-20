@@ -4,10 +4,15 @@ import glob
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from util import prepare_directory
+from util import prepare_directory, get_timestamp
+import sys
 
+get_model_cache = {}
 
-def get_model_by_timestamp(timestamp, verbose=True, with_data=True):
+def get_model_by_timestamp(timestamp, verbose=True, with_data=True, cache=False):
+    if cache and (timestamp in get_model_cache):
+        return get_model_cache[timestamp]
+
     p = get_full_path(timestamp)
     if None is p:
         return None
@@ -16,21 +21,40 @@ def get_model_by_timestamp(timestamp, verbose=True, with_data=True):
     lm, dataset, train_stats = full[:3]
     mp, dp, tp = full[3:]
     params = {"model_params": mp, "data_params": dp, "train_params": tp}
-    return lm, dataset, train_stats, params
+    res = lm, dataset, train_stats, params
+    if cache:
+        get_model_cache[timestamp] = res
+    return res
 
+get_checkpoints_cache = {}
 
-def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True):
+def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
+                                     cache=False):
+    if cache and (timestamp in get_checkpoints_cache):
+        return get_checkpoints_cache[timestamp]
+
     p_final = get_full_path(timestamp)
     p_containing = p_final[:-len("/final/")]
     paths = glob.glob(f"{p_containing}/*/")
-    results = {}
+    results = {"models":{}}
     for p in paths:
         desc = p.split("/")[-2]
         desc = "final" if desc == "final" else int(desc)
         full = saver.load_model(p, full=True, verbose=verbose,
                                 with_data=with_data)
         lm, dataset, train_stats = full[:3]
-        results[desc] = {"lm": lm, "train_stats": train_stats}
+        train_stats["total_train_samples"] = \
+            train_stats.get("train_batch_loss:main",[[0]])[-1][0]
+            # if not got, then this is the model at time 0 - no training yet
+        results["models"][desc] = {"lm": lm, "train_stats": train_stats}
+        if "params" not in results:
+            if with_data:
+                results["dataset"] = dataset
+            results["params"] = {"model_params": full[3],
+                                 "data_params": full[4],
+                                 "train_params": full[5]}
+    if cache:
+        get_checkpoints_cache[timestamp] = results
     return results
 
 
@@ -130,7 +154,8 @@ def check_validation(lm, dataset, train_stats, params):
     return recorded_val_loss - curr_val_loss
 
 
-def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
+def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None, 
+                  nsamples=None):
     # x: input sequence, whether as string or as list of token indices
     res = lm(x, get_attns=True)
     z, attns = res["logits"], res["attns"]
@@ -145,7 +170,7 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
     layers = list(range(attns.shape[1])) if None is layers else layers
     heads = list(range(attns.shape[2])) if None is heads else heads
     assert attns.shape[0] == 1  # single x - batch size 1
-    attns = attns[0]  # n layers x n heads x out seq len x in seq len
+    attns = attns[0].cpu()  # n layers x n heads x out seq len x in seq len
     for layer in layers:
         for h in heads:
             fig, ax = plt.subplots()
@@ -160,7 +185,10 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
             ax.set_xticks(range(len(token_ids)), labels=tokens)
             ax.set_yticks(range(len(token_ids)), labels=tokens)
 
-            plt.title(f"attn pattern for head {h} in layer {layer}")
+            title = f"attn pattern for head {h} in layer {layer}"
+            if None is not nsamples:
+                title += f" after {nsamples} samples"
+            plt.title(title)
             plt.xlabel("in dim")
             plt.ylabel("out dim")
             plt.xticks(rotation=-45, ha='left')
@@ -168,4 +196,35 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None):
             fig.show()
             if None is not folder_name:
                 fig.savefig(f"{folder_name}/L[{layer}]-H[{h}]")
-    return z, attns
+    return z, attns, fig
+
+
+def show_head_progress(timestamp, x, l, h, cache=True, store=False):
+    res = get_all_checkpoints_by_timestamp(timestamp,
+        verbose=False, cache=cache)
+    
+    task_name = res["params"]["data_params"].dataset_name
+    alphabet = list(res["models"][0]["lm"].tokenizer.get_vocab().keys())
+
+    if store:
+        folder_name = f"../attentions/{task_name}/{timestamp}/{l}-{h}"
+        prepare_directory(folder_name)
+
+    f = open(f"{folder_name}/notes.txt","w") if store else sys.stdout
+
+    print(f"showing attn patterns for model trained on task: [ {task_name} ].",
+          file=f)
+    print("\ttask alphabet:", "".join(sorted(alphabet)), file=f)
+    print("\tinput sequence:",x,file=f)
+
+    if store:
+        f.close()
+
+    models_by_nsamples = {d["train_stats"]["total_train_samples"]: d["lm"] for\
+                          n, d in res["models"].items()}
+
+    for nsamples in sorted(list(models_by_nsamples.keys())):
+        _, _, fig = show_lm_attns(models_by_nsamples[nsamples], x, layers=[l],
+                                  heads=[h], nsamples=nsamples)
+        if store:
+            fig.savefig(f"{folder_name}/{nsamples}")
