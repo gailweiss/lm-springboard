@@ -23,7 +23,8 @@ def get_model_by_timestamp(timestamp, verbose=True, with_data=True, cache=False)
     lm, dataset, train_stats = full[:3]
     mp, dp, tp = full[3:]
     params = {"model_params": mp, "data_params": dp, "train_params": tp}
-    res = lm, dataset, train_stats, params
+    res = {"lm": lm, "dataset": dataset, "train_stats": train_stats,
+           "params": params}
     if cache:
         get_model_cache[timestamp] = res
     return res
@@ -67,8 +68,8 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
 def verify_stable_load(timestamp):
     a1 = get_model_by_timestamp(timestamp)
     a2 = get_model_by_timestamp(timestamp)
-    m1, _, _, _ = a1
-    m2, _, _, _ = a2
+    m1 = a1["lm"]
+    m2 = a2["lm"]
 
     z1 = list(m1.parameters())
     z2 = list(m2.parameters())
@@ -84,8 +85,8 @@ def verify_stable_load(timestamp):
     assert torch.equal(m1([[1, 2]])["logits"], m2([[1, 2]])["logits"]), msg
 
     threshold = 1e-4
-    val_diff1 = check_validation(*a1)
-    val_diff2 = check_validation(*a2)
+    val_diff1 = check_validation(a1)
+    val_diff2 = check_validation(a2)
     msg = "validation too different from last recorded validation, diffs: " +\
           f"{val_diff1,val_diff2}" +\
           "check data creation/loading isn't randomised?"
@@ -151,9 +152,11 @@ def compute_validation(lm, dataset, params, sample=True):
     return mytrainer.last_val_loss
 
 
-def check_validation(lm, dataset, train_stats, params):
-    recorded_val_loss = train_stats["val_loss:main"][-1][1]
-    curr_val_loss = compute_validation(lm, dataset, params, sample=False)
+def check_validation(loaded_model):
+    recorded_val_loss = loaded_model["train_stats"]["val_loss:main"][-1][1]
+    curr_val_loss = compute_validation(loaded_model["lm"], 
+                                       loaded_model["dataset"],
+                                       loaded_model["params"], sample=False)
     print("last recorded val loss:", recorded_val_loss,
           ", loaded model val loss:", curr_val_loss,
           ",\ndiff:", recorded_val_loss - curr_val_loss)
