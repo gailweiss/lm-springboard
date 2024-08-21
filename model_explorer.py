@@ -163,8 +163,14 @@ def check_validation(loaded_model):
     return recorded_val_loss - curr_val_loss
 
 
-def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None, 
-                  nsamples=None):
+def show_lm_attns(timestamp, x, layers=None, heads=None, store=False, 
+                  chkpt="final", cache=True):
+    chkpts_dict = get_all_checkpoints_by_timestamp(timestamp,
+        verbose=False, cache=cache, with_data=False)
+    task_name = chkpts_dict["params"]["data_params"].dataset_name
+    lm = chkpts_dict["models"][chkpt]["lm"]
+    nsamples = chkpts_dict["models"][chkpt]["train_stats"]["total_train_samples"]
+
     # x: input sequence, whether as string or as list of token indices
     res = lm(x, get_attns=True)
     z, attns = res["logits"], res["attns"]
@@ -172,8 +178,9 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None,
     # attns shape: batch size x n layers x n heads x out seq len x in seq len
     # batch size should be 1
 
-    if None is not folder_name:
-        folder_name = f"../attentions/{folder_name}"
+    if store:
+        folder_name = f"../attentions/{task_name}/{timestamp}/" +\
+                      f"heads-at-chkpt/{chkpt}"
         prepare_directory(folder_name)
 
     layers = list(range(attns.shape[1])) if None is layers else layers
@@ -195,17 +202,16 @@ def show_lm_attns(lm, x, layers=None, heads=None, folder_name=None,
             ax.set_yticks(range(len(token_ids)), labels=tokens)
 
             title = f"attn pattern for head {h} in layer {layer}"
-            if None is not nsamples:
-                title += f" after {nsamples} samples"
+            title += f" after {nsamples} samples"
             plt.title(title)
             plt.xlabel("in dim")
             plt.ylabel("out dim")
             plt.xticks(rotation=-45, ha='left')
             fig = plt.gcf()
             fig.show()
-            if None is not folder_name:
+            if store:
                 fig.savefig(f"{folder_name}/L[{layer}]-H[{h}]")
-    return z, attns, fig
+    return z, attns, fig  # last fig, but good enough when only requesting one
 
 
 def show_head_progress(timestamp, x, l, h, cache=True, store=False):
@@ -216,7 +222,8 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
     alphabet = list(res["models"][0]["lm"].tokenizer.get_vocab().keys())
 
     if store:
-        folder_name = f"../attentions/{task_name}/{timestamp}/{l}-{h}"
+        folder_name = f"../attentions/{task_name}/{timestamp}/" +\
+                      f"heads-over-time/L[{l}]-H[{h}]"
         prepare_directory(folder_name)
 
     f = open(f"{folder_name}/notes.txt","w") if store else sys.stdout
@@ -233,7 +240,7 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
                           n, d in res["models"].items()}
 
     for nsamples in sorted(list(models_by_nsamples.keys())):
-        _, _, fig = show_lm_attns(models_by_nsamples[nsamples], x, layers=[l],
-                                  heads=[h], nsamples=nsamples)
+        _, _, fig = show_lm_attns(timestamp, x, layers=[l], heads=[h],
+                                  chkpt=nsamples, cache=cache)
         if store:
             fig.savefig(f"{folder_name}/{nsamples}")
