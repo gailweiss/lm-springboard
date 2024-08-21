@@ -49,7 +49,7 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
                                 with_data=with_data)
         lm, dataset, train_stats = full[:3]
         train_stats["total_train_samples"] = \
-            train_stats.get("train_batch_loss:main",[[0]])[-1][0]
+            train_stats.get("n_train_samples",[[0]])[-1][0]
             # if not got, then this is the model at time 0 - no training yet
         results["models"][desc] = {"lm": lm, "train_stats": train_stats}
 
