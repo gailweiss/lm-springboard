@@ -8,25 +8,91 @@ from util import prepare_directory, get_timestamp, glob_nosquares
 import sys
 
 
+final_chkpt = "final"
+
+
+def auto_timestamps():
+    def is_timestamp(sample):
+        example = "2024-08-20--12-12-12"
+        if not len(sample) == len(example):
+            return False
+        for s,e in zip(sample, example):
+            if e == "-":
+                if not s == "-":
+                    return False
+            elif not s in "0123456789":
+                return False
+        return True
+    
+    def task_name(path):
+        if "/synth/" in path:
+            return path.split("/synth/")[1].split("/")[0]
+        print("new path type:", path)
+        return "?"
+    
+    def last_folder(path):
+        return path.split("/")[-1]
+    
+    def last_is_timestamp(path):
+        return is_timestamp(last_folder(path))
+    
+    # a = glob.glob("../saved-models/**", recursive=True)[4].split("/")[-1]
+    all_paths = glob.glob("../saved-models/**", recursive=True)
+    all_paths = [p for p in all_paths if last_is_timestamp(p)]
+    all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
+    res = {}
+    for tn, ts, p in all_tuples:
+        if tn not in res:
+            res[tn] = []
+        res[tn].append((ts, p))
+    return res
+
+
+def checkpoint_ids(timestamp):
+    all_paths = glob.glob("../saved-models/**", recursive=True)
+    folder = next(p for p in all_paths if p.endswith(f"/{timestamp}"))
+    def is_checkpoint_folder(p):
+        bits = p.split(f"/{timestamp}/")
+        if len(bits) != 2:
+            return False
+        return "/" not in bits[1]
+        
+    checkpoint_paths = [p for p in all_paths if is_checkpoint_folder(p)]
+    def as_int(c):
+        for t in c:
+            if t not in "0123456789":
+                return c
+        return int(c)
+    chkpts = [as_int(p.split("/")[-1]) for p in checkpoint_paths]
+    return sorted([i for i in chkpts if isinstance(i,int)]) + \
+           sorted([i for i in chkpts if not isinstance(i,int)])
+
+
 get_model_cache = {}
 
 
-def get_model_by_timestamp(timestamp, verbose=True, with_data=True, cache=False):
-    if cache and (timestamp in get_model_cache):
-        return get_model_cache[timestamp]
+def get_model_by_timestamp(timestamp, checkpoint=final_chkpt, verbose=True,
+                           with_data=True, cache=False):
+    identifier = (timestamp, checkpoint, with_data)
+    if cache:
+        if identifier in get_model_cache:
+            return get_model_cache[identifier]
+        id2 = (timestamp, checkpoint, True)
+        if id2 in get_model_cache:   # data already loaded, no harm
+            return get_model_cache[id2]
 
-    p = get_full_path(timestamp)
+
+    p = get_full_path(timestamp, checkpoint=checkpoint)
     if None is p:
         return None
 
-    full = saver.load_model(p, full=True, verbose=verbose, with_data=with_data)
-    lm, dataset, train_stats = full[:3]
-    mp, dp, tp = full[3:]
-    params = {"model_params": mp, "data_params": dp, "train_params": tp}
-    res = {"lm": lm, "dataset": dataset, "train_stats": train_stats,
-           "params": params}
+    res = saver.load_model(p, full=True, verbose=verbose, with_data=with_data)
+
     if cache:
-        get_model_cache[timestamp] = res
+        if (timestamp, checkpoint, False) in get_model_cache:
+            del get_model_cache[(timestamp, checkpoint, False)]
+        get_model_cache[identifier] = res
+
     return res
 
 
@@ -36,38 +102,44 @@ get_checkpoints_cache = {}
 def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
                                      cache=False):
     identifier = (timestamp, with_data)
-    if cache and (identifier in get_checkpoints_cache):
-        return get_checkpoints_cache[identifier]
+    if cache: 
+        if identifier in get_checkpoints_cache:
+            return get_checkpoints_cache[identifier]
+        id2 = (timestamp, True)
+        if id2 in get_checkpoints_cache:  # no harm in extra info
+            return get_checkpoints_cache[id2]
 
-    p_final = get_full_path(timestamp)
-    p_containing = p_final[:-len("/final/")]
+    p_final = get_full_path(timestamp, checkpoint=final_chkpt)
+    p_containing = p_final[:-len(f"/{final_chkpt}/")]
     paths = glob_nosquares(f"{p_containing}/*/")
     results = {"models":{}}
     for p in paths:
         desc = p.split("/")[-2]
         desc = "final" if desc == "final" else int(desc)
-        full = saver.load_model(p, full=True, verbose=verbose,
+        res = saver.load_model(p, full=True, verbose=verbose,
                                 with_data=with_data)
-        lm, dataset, train_stats = full[:3]
-        train_stats["total_train_samples"] = \
-            train_stats.get("n_train_samples",[[0]])[-1][0]
-            # if not got, then this is the model at time 0 - no training yet
-        results["models"][desc] = {"lm": lm, "train_stats": train_stats}
+        results["models"][desc] = {a: res[a] for a in ["lm", "train_stats"]}
 
         if "params" not in results:
             if with_data:
-                results["dataset"] = dataset
-            results["params"] = {"model_params": full[3],
-                                 "data_params": full[4],
-                                 "train_params": full[5]}
+                results["dataset"] = res["dataset"]
+            results["params"] = res["params"]
+
     if cache:
+        if (timestamp, False) in get_checkpoints_cache:
+            del get_checkpoints_cache[(timestamp, False)]
         get_checkpoints_cache[identifier] = results
     return results
 
 
-def verify_stable_load(timestamp):
-    a1 = get_model_by_timestamp(timestamp)
-    a2 = get_model_by_timestamp(timestamp)
+def clear_chkpts_cache():
+    for k in get_checkpoints_cache:
+        del get_checkpoints_cache[k]
+
+
+def verify_stable_load(timestamp, checkpoint=final_chkpt):
+    a1 = get_model_by_timestamp(timestamp, checkpoint)
+    a2 = get_model_by_timestamp(timestamp, checkpoint)
     m1 = a1["lm"]
     m2 = a2["lm"]
 
@@ -104,16 +176,16 @@ def verify_stable_load(timestamp):
     print("passed basic load checks")
 
 
-def get_full_path(timestamp):
+def get_full_path(timestamp, checkpoint=final_chkpt):
     paths = glob.glob("../saved-models/**/", recursive=True)
-    paths = [p for p in paths if (timestamp in p and p.endswith("/final/"))]
+    paths = [p for p in paths if (timestamp in p and p.endswith(f"/{checkpoint}/"))]
     if len(paths) == 1:
         return paths[0]
     if len(paths) < 1:
-        print("could not find model folder with timestamp:", timestamp)
+        print("could not find model folder with:", timestamp, checkpoint)
         return None
     if len(paths) > 1:
-        print("found multiple model folders with timestamp:", timestamp)
+        print("found multiple model folders with:", timestamp, checkpoint)
         print(paths)
         return None
 
@@ -164,12 +236,13 @@ def check_validation(loaded_model):
 
 
 def show_lm_attns(timestamp, x, layers=None, heads=None, store=False, 
-                  chkpt="final", cache=True):
-    chkpts_dict = get_all_checkpoints_by_timestamp(timestamp,
-        verbose=False, cache=cache, with_data=False)
-    task_name = chkpts_dict["params"]["data_params"].dataset_name
-    lm = chkpts_dict["models"][chkpt]["lm"]
-    nsamples = chkpts_dict["models"][chkpt]["train_stats"]["total_train_samples"]
+                  checkpoint=final_chkpt, cache=True):
+    
+    chkpt = get_model_by_timestamp(timestamp, checkpoint=checkpoint,
+        verbose=False, with_data=False, cache=cache)
+    task_name = chkpt["params"]["data_params"].dataset_name
+    lm = chkpt["lm"]
+    nsamples = chkpt["train_stats"]["total_train_samples"]
 
     # x: input sequence, whether as string or as list of token indices
     res = lm(x, get_attns=True)
@@ -180,7 +253,7 @@ def show_lm_attns(timestamp, x, layers=None, heads=None, store=False,
 
     if store:
         folder_name = f"../attentions/{task_name}/{timestamp}/" +\
-                      f"heads-at-chkpt/{chkpt}"
+                      f"heads-at-chkpt/{checkpoint}"
         prepare_directory(folder_name)
 
     layers = list(range(attns.shape[1])) if None is layers else layers
@@ -241,6 +314,6 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
 
     for nsamples in sorted(list(models_by_nsamples.keys())):
         _, _, fig = show_lm_attns(timestamp, x, layers=[l], heads=[h],
-                                  chkpt=nsamples, cache=cache)
+                                  checkpoint=str(nsamples), cache=cache)
         if store:
             fig.savefig(f"{folder_name}/{nsamples}")

@@ -42,6 +42,9 @@ def load_model(folder_name, full=False, verbose=True,
 
     with open(path_join(folder_name, "train_stats.json"), "r") as f:
         train_stats = json.load(f)
+        train_stats["total_train_samples"] = \
+            train_stats.get("n_train_samples",[[0]])[-1][0]
+            # if not got, then this is the model at time 0 - no training yet
 
     tokenizer = known_tokenizer
     if None is tokenizer:
@@ -63,8 +66,8 @@ def load_model(folder_name, full=False, verbose=True,
     lm = model_trainer.model
     lm.eval()  # return with training off, im basically never trying to retrain
     # a loaded model, at least for now
-    if full:
-        return (lm, dataset, train_stats, model_params, data_params,
-                train_params)
-    else:
-        return lm, dataset
+    params = {"model_params": model_params, "data_params": data_params,
+              "train_params": train_params}
+    res = {"lm": lm, "dataset": dataset, "train_stats": train_stats,
+           "params": params}
+    return res
