@@ -6,6 +6,7 @@ from train.trainer import Trainer
 import torch
 from util import prepare_directory, get_timestamp, glob_nosquares
 import sys
+from os.path import join as path_join
 
 
 final_chkpt = "final"
@@ -137,6 +138,18 @@ def clear_chkpts_cache():
         del get_checkpoints_cache[k]
 
 
+info_cache = {}
+
+
+def get_info(timestamp):
+    if timestamp in info_cache:
+        return info_cache[timestamp]
+    path = get_full_path(timestamp, checkpoint=final_chkpt)
+    res = saver.load_model_info(path)
+    info_cache[timestamp] = res
+    return res
+
+
 def verify_stable_load(timestamp, checkpoint=final_chkpt):
     a1 = get_model_by_timestamp(timestamp, checkpoint)
     a2 = get_model_by_timestamp(timestamp, checkpoint)
@@ -190,24 +203,70 @@ def get_full_path(timestamp, checkpoint=final_chkpt):
         return None
 
 
-def plot_metric(train_stats, metric_name, folder_name=None):
-    d = train_stats[metric_name]
-    n_train_samples, metric, stat_indices = list(zip(*d))
+def plot_metrics(timestamps, metric_names, title=None, folder_name=None):
+    # timestamps can be a dict giving the timestamps special names for 
+    # the plot labels, or just an iterable with the timestamps of interest
+    # (in which case they will be labeled by their task name)
+    if isinstance(timestamps, str):
+        timestamps = [timestamps]
+    if isinstance(metric_names, str):
+        metric_names = [metric_names]
+    
+    msg = "cant have multiple metrics and timestamps"
+    assert 1 in [len(timestamps), len(metric_names)], msg
+
+    single_metric = len(metric_names) == 1 
+    
+    def ylabel_():
+        if single_metric:
+            return metric_names[0]
+        prefs = list(set(m.split("/")[0] for m in metric_names))
+        if len(prefs) == 1:
+            return prefs[0]
+        return "metric"
+
+    def plt_title():
+        if None is not title:
+            return title
+        if single_metric:
+            return metric_names[0]
+        # not single metric -> necessarily single task
+        return get_info(timestamps[0])["params"]["data_params"].dataset_name
+
+    ylabel = ylabel_()
     fig, ax = plt.subplots()
-    plt.scatter(n_train_samples, metric, s=0.5)
-    plt.xlabel("n_train_samples")
-    plt.ylabel(metric_name)
-    plt.title(metric_name)
+    plt.xlabel("n_train_samples")        
+    plt.ylabel(ylabel)
+    plt.title(plt_title())
+    for t in timestamps:
+        for m in metric_names:
+            t_info = get_info(t)
+            if m not in t_info["train_stats"]:
+                continue  # eg if trying to show copy loss on several
+                # timestamps but one is just pairs
+            d = t_info["train_stats"][m]
+            n_train_samples, metric, stat_indices = list(zip(*d))
+            def label():
+                if single_metric:
+                    if isinstance(timestamps, dict):
+                        # timestamps have been given with labels for plot
+                        return timestamps[t]
+                    return t_info["params"]["data_params"].dataset_name
+                # else, single task, multiple metrics
+                res = m
+                if res.startswith(ylabel):
+                    res = res[len(ylabel):]
+                if res.startswith("/"):
+                    res = res[1:]
+                return res
+            plt.scatter(n_train_samples, metric, s=0.5, label=label())
+    ax.legend()
     fig = plt.gcf()
     fig.show()
     if None is not folder_name:
         f = f"../metrics/{folder_name}"
         prepare_directory(f)
         fig.savefig(f"{f}/{metric_name}.png")
-
-
-def list_metrics(train_stats):
-    return list(train_stats.keys())
 
 
 def compute_validation(lm, dataset, params, sample=True):

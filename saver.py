@@ -24,6 +24,26 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
     pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
 
 
+def load_model_info(folder_name):
+    if Path(folder_name).exists() is False:
+        raise ValueError(f"Folder {folder_name} does not exist")
+
+    res = {"params": {}}
+    with open(path_join(folder_name, "model_params.json"), "r") as f:
+        res["params"]["model_params"] = ModelParams(**json.load(f))
+    with open(path_join(folder_name, "data_params.json"), "r") as f:
+        res["params"]["data_params"] = DataParams(**json.load(f))
+    with open(path_join(folder_name, "train_params.json"), "r") as f:
+        res["params"]["train_params"] = TrainParams(**json.load(f))
+
+    with open(path_join(folder_name, "train_stats.json"), "r") as f:
+        res["train_stats"] = json.load(f)
+        res["train_stats"]["total_train_samples"] = \
+            res["train_stats"].get("n_train_samples",[[0]])[-1][0]
+            # if not got, then this is the model at time 0 - no training yet
+
+    return res
+
 def load_model(folder_name, full=False, verbose=True,
                with_data=False, known_tokenizer=None):
     # folder_name = path_join("../artifacts/models", folder_name)
@@ -33,41 +53,32 @@ def load_model(folder_name, full=False, verbose=True,
     if Path(folder_name).exists() is False:
         raise ValueError(f"Folder {folder_name} does not exist")
 
-    with open(path_join(folder_name, "model_params.json"), "r") as f:
-        model_params = ModelParams(**json.load(f))
-    with open(path_join(folder_name, "data_params.json"), "r") as f:
-        data_params = DataParams(**json.load(f))
-    with open(path_join(folder_name, "train_params.json"), "r") as f:
-        train_params = TrainParams(**json.load(f))
-
-    with open(path_join(folder_name, "train_stats.json"), "r") as f:
-        train_stats = json.load(f)
-        train_stats["total_train_samples"] = \
-            train_stats.get("n_train_samples",[[0]])[-1][0]
-            # if not got, then this is the model at time 0 - no training yet
+    res = load_model_info(folder_name)
 
     tokenizer = known_tokenizer
     if None is tokenizer:
         tokenizer = load_stored_tokenizer_if_exists(
-            model_params.tokenizer_source_name, folder_name, verbose)
+            res["params"]["model_params"].tokenizer_source_name, folder_name,
+            verbose)
 
-    train_params.no_wandb = True  # no wandb in loaded models - or it will
-    # try (unsuccessfully) to send validation losses to wandb when doing a
-    # validation run
-    lm, dataset = make_model_and_data(data_params, model_params, train_params,
+    res["params"]["train_params"].no_wandb = True  # no wandb in loaded models
+    # - or it will try (unsuccessfully) to send validation losses to wandb when
+    # doing a validation run
+    lm, dataset = make_model_and_data(res["params"]["data_params"], 
+                                      res["params"]["model_params"], 
+                                      res["params"]["train_params"],
                                       tokenizer=tokenizer, verbose=verbose,
                                       skip_data=not with_data)
     # if with_data==False, will receive None for dataset
 
     model_trainer = Trainer.load_from_checkpoint(
                                 path_join(folder_name, "model.model"),
-                                model=lm, train_params=train_params)
+                                model=lm,
+                                train_params=res["params"]["train_params"])
 
     lm = model_trainer.model
     lm.eval()  # return with training off, im basically never trying to retrain
     # a loaded model, at least for now
-    params = {"model_params": model_params, "data_params": data_params,
-              "train_params": train_params}
-    res = {"lm": lm, "dataset": dataset, "train_stats": train_stats,
-           "params": params}
+    res["lm"] = lm
+    res["dataset"] = dataset
     return res
