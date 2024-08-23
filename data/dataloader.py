@@ -6,14 +6,33 @@ from dataclasses import dataclass
 import datasets
 from data.syntheticdata import syntheticdatasets
 import glob
+from os.path import join as path_join
+from model.tokenizer import load_stored_tokenizer_if_exists
+from model.model_params import ModelParams
+import numpy as np
+from util import prepare_directory
+import json
+
 
 try:
     with open("../../data-path.txt", "r") as f:
-        datapath = f.readlines()[0]  # path to your local data folder,
+        datapath = f.readlines()[0].strip("\n")
+        # path to your local data folder,
         # e.g. /Users/yourname/Documents/mydata
 except Exception as e:
     print("couldnt read datapath for local datasets")
     datapath = None
+
+
+try:
+    with open("datamodules-paths.txt", "r") as f:
+        datamodules_paths = f.readlines()
+        # e.g. ../dataloaders, or more complicated if using cloud services
+        datamodules_paths = [l.strip("\n") for l in datamodules_paths if not
+                             l.startswith("#")]
+except Exception as e:
+    print("couldnt find extra dataloader paths")
+    datamodules_paths = "../datamodules"
 
 
 @dataclass
@@ -71,6 +90,11 @@ class DataParams:
 #   model but only want to finetune up to certain length
 
 
+def set_synthetic_task_flag(data_params):
+    data_params.is_synthetic_task = \
+        syntheticdatasets.has_dataset(data_params.dataset_name)
+
+
 def get_local_datafolder(n):
     if None is datapath:
         return None
@@ -82,15 +106,14 @@ def get_local_datafolder(n):
 
 
 def get_data(data_params):
-    data_params.is_synthetic_task = False
+    set_synthetic_task_flag(data_params)
     if data_params.dataset_name == "dummy":
         samples = verysimplesamplesreader(".", data_params)
     elif data_params.dataset_name == "wikitext":
         samples = wikitextloader()
     elif data_params.dataset_name == "ptb":
         samples = ptbloader()
-    elif data_params.dataset_name in syntheticdatasets.names():
-        data_params.is_synthetic_task = True
+    elif data_params.is_synthetic_task:
         samples = syntheticdatasets.get(data_params.dataset_name)
     elif None is not get_local_datafolder(data_params.dataset_name):
         samples = verysimplesamplesreader(
@@ -107,26 +130,115 @@ def get_data(data_params):
     return samples
 
 
+def get_existing_datamodule(data_params, model_params):
+    def is_match(dpd, mpd):
+        # all the attrs that determine the dataset and the tokenizer
+        important_model_attrs = ["max_seq_len", "tokenizer_source_name"]
+        important_data_attrs = ["dataset_name", "debug_crop", 
+                                "breaking_synthetic_samples_ok",
+                                "val_pct", "test_pct", "lines_per_sample", 
+                                "max_seq_len"]
+        for a in important_data_attrs:
+            if not dpd[a] == getattr(data_params, a):
+                return False
+        for a in important_model_attrs:
+            if not mpd[a] == getattr(model_params, a):
+                return False
+        if model_params.tokenizer_source_name == "custom":
+            if not (mpd["custom_tokenizer_ntokens"] == 
+                    model_params.custom_tokenizer_ntokens):
+                return False
+        return True
+
+    set_synthetic_task_flag(data_params)
+    for p in datamodules_paths:
+        with_timestamps = glob.glob(f"{p}/*")
+        for path in with_timestamps:
+            with open(path_join(path, "model_params.json"), "r") as f:
+                mpd = json.load(f)
+            with open(path_join(path, "data_params.json"), "r") as f:
+                dpd = json.load(f)
+            if is_match(dpd, mpd):
+                return LMDataModule(None, None, None, None, from_folder=path)
+    return None
+
+
 class LMDataModule(pl.LightningDataModule):
     def __init__(self, data, tokenizer, data_params, model_params,
-                 verbose_init=False):
+                 verbose_init=False, from_folder=None):
         super().__init__()
+        self.verbose_init = verbose_init
+        if None is not from_folder:
+            self.setup_from_folder(from_folder)
+            return
         self.data_params = data_params
         self.model_params = model_params
         self.tokenizer = tokenizer
-        self.verbose_init = verbose_init
+        self.set_max_seq_len()
 
+        if isinstance(data, list):
+            self.setup_from_list(data)
+        else:  # DatasetDict through huggingface
+            self.setup_from_data_dict(data)
+
+    def set_max_seq_len(self):
         self.max_seq_len = self.model_params.max_seq_len
         if self.data_params.max_seq_len > 0:
             self.max_seq_len = min(self.max_seq_len,
                                    self.data_params.max_seq_len)
 
-        if isinstance(data, list):
-            self.setup_from_list(data)
-        else:  # DatasetDict through huggingface
-            self.setup_from_ddict(data)
+    def setup_from_folder(self, path):
+        with open(path_join(path, "model_params.json"), "r") as f:
+            self.model_params = ModelParams(**json.load(f))
+        with open(path_join(path, "data_params.json"), "r") as f:
+            self.data_params = DataParams(**json.load(f))
+        self.tokenizer = load_stored_tokenizer_if_exists(
+            self.model_params.tokenizer_source_name, path, self.verbose_init)
+        assert None is not self.tokenizer  
+        # can't be loading data without its tokenizer
+        self.set_max_seq_len()
+        
+        with open(path_join(path, "dataloader_notes.json"), "r") as f:
+            base_attrs = json.load(f)
+        [setattr(self, an, base_attrs[an]) for an in base_attrs]
 
-    def setup_from_ddict(self, samples):
+        # load train, test, val samples
+        for sn in ["train_samples", "test_samples", "val_samples"]:
+            indices = np.load(path_join(path, f"{sn}.npy"))
+            samples = [s[1:s[0]+1] for s in indices]  # first value is length
+            setattr(self, sn, samples)
+        # any other properties?
+        self.finalise_data()
+
+    def save_to_folder(self, path):
+        prepare_directory(path)
+        # save tokenizer, save self
+        self.tokenizer.save(path)
+        base_attr_names = ["train_n", "test_n", "val_n"]
+        base_attrs = {n: getattr(self,n) for n in base_attr_names}
+        with open(path_join(path, f"dataloader_notes.json"), "w") as f:
+            json.dump(base_attrs, f)
+        with open(path_join(path, f"model_params.json"), "w") as f:
+            json.dump(vars(self.model_params), f)
+        with open(path_join(path, f"data_params.json"), "w") as f:
+            json.dump(vars(self.data_params), f)
+
+        # save data
+        def samples_as_array(samples):
+            # todo: make all the data be a numpy array in main dataloader, 
+            # probably easier on mycollate than these lists of lists
+            m = max(len(s) for s in samples)
+            indices = np.zeros((len(samples), m + 1), dtype=int)
+            for i, inds in enumerate(samples):
+                n = len(inds)
+                indices[i, : n + 1] = [n] + inds
+            return indices
+
+        for sn in ["train_samples", "test_samples", "val_samples"]:
+            arr = samples_as_array(getattr(self,sn))
+            np.save(path_join(path, f"{sn}.npy"), arr, allow_pickle=False)
+
+    def setup_from_data_dict(self, samples):
         train_samples = samples["train"]
         val_samples = samples["validation"]
         test_samples = samples["test"]
@@ -205,6 +317,9 @@ class LMDataModule(pl.LightningDataModule):
             print(f"before chunking: {data_descstr}\n",
                   f"after chunking: {final_descstrs}")
 
+        self.finalise_data()
+
+    def finalise_data(self):
         # for showing samples
         self.data = self.train_samples + self.val_samples + self.test_samples
         self.train_n = len(self.train_samples)

@@ -1,0 +1,59 @@
+from model.transformer.transformer import Transformer
+from create import make_model
+from save_load import load_model, get_datamodule
+from model_explorer import get_full_path
+
+
+def sync_model_params(requested_model_params, loaded_model_params):
+    # these factors are from the loaded model, so write them back:
+    print("loaded a model and now syncing a subset of the model params!")
+    print("if you have changed the model implementation - make sure")
+    print("this function is syncing all the relevant params!")
+    for a in ["n_layers", "n_heads", "dim", "dim_ff_factor",
+              "tokenizer_source_name", "custom_tokenizer_ntokens",
+              "layer_architecture", "from_os_pretrained",
+              "individual_head_params", "pos_encoding", "max_seq_len"]:
+        setattr(requested_model_params, a, getattr(loaded_model_params, a))
+
+
+def setup_model_and_data(data_params, model_params, train_params, verbose=True,
+                         skip_data=False, keep_datamodule=False):
+    
+    dataset = None
+
+    loading = model_params.from_saved or model_params.from_os_pretrained    
+    load_res = {}
+    if loading:
+        if model_params.from_saved:
+            p = get_full_path(timestamp, checkpoint=checkpoint)
+            assert None is not p, f"didn't find path for timestamp {timestamp}"
+            load_res = load_model(p, full=True, verbose=verbose, 
+                                  with_data=not skip_data)
+            dataset = load_res["dataset"]
+        else:
+            if model_params.from_os_pretrained == "gpt2":
+                load_res["lm"] = get_gpt2()
+            else:
+                raise NotImplementedError("unknown pretrained model requested:" +
+                                      f"{model_params.from_os_pretrained}")
+
+        lm = load_res["lm"]
+        sync_model_params(model_params, lm.model_params)
+
+    if (None is dataset) and not skip_data:
+        # model params already been synced, can use them for the datamodule
+        dataset = get_datamodule(data_params, model_params, verbose=verbose,
+                                 keep_datamodule=keep_datamodule)
+        
+    if not loading:  # ie, making
+        assert not skip_data  # need data to determine the tokenizer
+        lm = make_model(model_params, train_params, dataset.tokenizer)
+
+    return lm, dataset
+
+
+def quick_data_grab(dataset_name, tokenizer_source_name="gpt2", verbose=False):
+    dp = DataParams(dataset_name=dataset_name, debug_crop=500)
+    mp = ModelParams(tokenizer_source_name=tokenizer_source_name)
+    tp = TrainParams()
+    return make_datamodule(dp, mp, tp, verbose=verbose, keep_datamodule=False)

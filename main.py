@@ -10,8 +10,9 @@ import argparse
 from dataclasses import asdict
 import wandb
 from util import get_timestamp, print_nicely_nested, in_try
-from saver import save_model as save_model_
-from create import make_model_and_data
+from save_load import save_model as save_model_
+from save_load import final_chkpt
+from setup import setup_model_and_data
 import shutil
 from copy import deepcopy
 import glob
@@ -36,6 +37,8 @@ parser.add_argument('--no-wandb', action='store_true')
 parser.add_argument('--gpu-id', type=int, default=None)
 # for internal debug use (can be passed to get_exception at the bottom here)
 parser.add_argument('--return-things', type=bool, default=False)
+parser.add_argument('--keep-datamodule', action='store_true')
+
 
 MAIN_PROJ = "base"  # project name for wandb runs
 wandb_username = "gail_weiss"
@@ -193,7 +196,7 @@ def save_model(args, saving_folder, pltrainer, dp, tp):
     mytrainer = pltrainer.model
     lm = mytrainer.model
     if args.save:
-        fn = f"{saving_folder}/final"
+        fn = f"{saving_folder}/{final_chkpt}"
         # make sure to use the updated model params after all this
         save_model_(fn, pltrainer, mytrainer, lm.model_params, dp, tp)
         print("saved model in:\n", fn)
@@ -205,7 +208,8 @@ def run_config(args, dp, tp, mp, namer):
     print("going to train from config: [", args.config,
           "], using the following parameters:")
     print_nicely_nested(full_params)
-    lm, dataset = make_model_and_data(dp, mp, tp)
+    lm, dataset = setup_model_and_data(dp, mp, tp, 
+                                      keep_datamodule=args.keep_datamodule)
     saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
     pltrainer = train(args, lm, dataset, tp, dp, saving_folder)
     show_sample(pltrainer.model.model)

@@ -10,6 +10,9 @@ class SyntheticData:
     def names(self):
         return list(self.generators.keys())
 
+    def has_dataset(self, name):
+        return name in self.names()
+
     def get(self, name):
         f = self.generators[name]
         random.seed(0)  # for reproducibility (specifically if want to
@@ -45,7 +48,7 @@ def histogram():
     return letters + "::" + str(res)
 
 
-@registered
+@registered()
 def long_addition():
     n1 = random.randint(0, 10)  # up to 10 digits
     n2 = random.randint(0, 10)

@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import saver
+from save_load import load_model, load_model_info, final_chkpt
 import glob
 import lightning as pl
 from train.trainer import Trainer
@@ -7,9 +7,6 @@ import torch
 from util import prepare_directory, get_timestamp, glob_nosquares
 import sys
 from os.path import join as path_join
-
-
-final_chkpt = "final"
 
 
 def auto_timestamps():
@@ -26,10 +23,9 @@ def auto_timestamps():
         return True
     
     def task_name(path):
-        if "/synth/" in path:
-            return path.split("/synth/")[1].split("/")[0]
-        print("new path type:", path)
-        return "?"
+        path = path.split("../saved-models/")[1]
+        # config = path.split("/")[0]
+        return path.split("/")[1]
     
     def last_folder(path):
         return path.split("/")[-1]
@@ -87,7 +83,7 @@ def get_model_by_timestamp(timestamp, checkpoint=final_chkpt, verbose=True,
     if None is p:
         return None
 
-    res = saver.load_model(p, full=True, verbose=verbose, with_data=with_data)
+    res = load_model(p, full=True, verbose=verbose, with_data=with_data)
 
     if cache:
         if (timestamp, checkpoint, False) in get_model_cache:
@@ -116,8 +112,8 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
     results = {"models":{}}
     for p in paths:
         desc = p.split("/")[-2]
-        desc = "final" if desc == "final" else int(desc)
-        res = saver.load_model(p, full=True, verbose=verbose,
+        desc = final_chkpt if desc == final_chkpt else int(desc)
+        res = load_model(p, full=True, verbose=verbose,
                                 with_data=with_data)
         results["models"][desc] = {a: res[a] for a in ["lm", "train_stats"]}
 
@@ -145,7 +141,7 @@ def get_info(timestamp):
     if timestamp in info_cache:
         return info_cache[timestamp]
     path = get_full_path(timestamp, checkpoint=final_chkpt)
-    res = saver.load_model_info(path)
+    res = load_model_info(path)
     info_cache[timestamp] = res
     return res
 
@@ -187,20 +183,6 @@ def verify_stable_load(timestamp, checkpoint=final_chkpt):
     assert torch.equal(m1([[1, 2]])["logits"], m2([[1, 2]])["logits"]), msg
 
     print("passed basic load checks")
-
-
-def get_full_path(timestamp, checkpoint=final_chkpt):
-    paths = glob.glob("../saved-models/**/", recursive=True)
-    paths = [p for p in paths if (timestamp in p and p.endswith(f"/{checkpoint}/"))]
-    if len(paths) == 1:
-        return paths[0]
-    if len(paths) < 1:
-        print("could not find model folder with:", timestamp, checkpoint)
-        return None
-    if len(paths) > 1:
-        print("found multiple model folders with:", timestamp, checkpoint)
-        print(paths)
-        return None
 
 
 def plot_metrics(timestamps, metric_names, title=None, folder_name=None):
@@ -351,7 +333,8 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
         verbose=False, cache=cache, with_data=False)
     
     task_name = res["params"]["data_params"].dataset_name
-    alphabet = list(res["models"][0]["lm"].tokenizer.get_vocab().keys())
+    alphabet = \
+        list(res["models"][final_chkpt]["lm"].tokenizer.get_vocab().keys())
 
     if store:
         folder_name = f"../attentions/{task_name}/{timestamp}/" +\
@@ -376,3 +359,16 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
                                   checkpoint=str(nsamples), cache=cache)
         if store:
             fig.savefig(f"{folder_name}/{nsamples}")
+
+def get_full_path(timestamp, checkpoint=final_chkpt):
+    paths = glob.glob("../saved-models/**/", recursive=True)
+    paths = [p for p in paths if (timestamp in p and p.endswith(f"/{checkpoint}/"))]
+    if len(paths) == 1:
+        return paths[0]
+    if len(paths) < 1:
+        print("could not find model folder with:", timestamp, checkpoint)
+        return None
+    if len(paths) > 1:
+        print("found multiple model folders with:", timestamp, checkpoint)
+        print(paths)
+        return None
