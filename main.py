@@ -29,13 +29,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str, default="debug")
 parser.add_argument('--task', type=str, default=None)  # e.g. copy, wikitext
 parser.add_argument('--wandb-proj-name', type=str, default=None)
-parser.add_argument('--save', action='store_true')
-# no ablations exist in the base code, but this arg is ready for adding them
+parser.add_argument('--save', action='store_true')  # save all including model
+parser.add_argument('--save-stats', action='store_true')  # save all but model
+# no ablations exist in the base code, but this arg is ready for adding them:
 parser.add_argument('--ablate', action='store_true')
-# allow blocking wandb from command (but can also do it from config file)
+# allow blocking wandb from command (but can also do it from config file):
 parser.add_argument('--no-wandb', action='store_true')
 parser.add_argument('--gpu-id', type=int, default=None)
-# for internal debug use (can be passed to get_exception at the bottom here)
+# for internal debug use (can be passed to get_exception at the bottom here):
 parser.add_argument('--return-things', type=bool, default=False)
 parser.add_argument('--keep-datamodule', action='store_true')
 
@@ -195,11 +196,12 @@ def show_sample(lm):
 def save_model(args, saving_folder, pltrainer, dp, tp):
     mytrainer = pltrainer.model
     lm = mytrainer.model
-    if args.save:
+    if args.save or args.save_stats:
         fn = f"{saving_folder}/{final_chkpt}"
         # make sure to use the updated model params after all this
-        save_model_(fn, pltrainer, mytrainer, lm.model_params, dp, tp)
-        print("saved model in:\n", fn)
+        save_model_(fn, pltrainer, mytrainer, lm.model_params, dp, tp,
+                    just_stats=not args.save)
+        print(f"saved model {'' if args.save else ' stats'} in:\n", fn)
 
 
 def run_config(args, dp, tp, mp, namer):

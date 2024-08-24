@@ -15,7 +15,7 @@ final_chkpt = "final"
 
 
 def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
-               train_params):
+               train_params, just_stats=False):
     prepare_directory(folder_name)
     for p, n in [(model_params, "model_params"),
                  (data_params, "data_params"),
@@ -24,8 +24,9 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
             json.dump(vars(p), f)
     with open(path_join(folder_name, "train_stats.json"), "w") as f:
         json.dump(my_trainer.logged_stats_dict, f)
-    pl_trainer.model.model.tokenizer.save(folder_name)
-    pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
+    if not just_stats:
+        pl_trainer.model.model.tokenizer.save(folder_name)
+        pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
 
 
 def load_model_info(folder_name):
