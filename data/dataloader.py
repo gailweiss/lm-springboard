@@ -152,7 +152,7 @@ def get_existing_datamodule(data_params, model_params):
 
     set_synthetic_task_flag(data_params)
     for p in datamodules_paths:
-        with_timestamps = glob.glob(f"{p}/*")
+        with_timestamps = glob.glob(f"{p}/{data_params.dataset_name}/*")
         for path in with_timestamps:
             with open(path_join(path, "model_params.json"), "r") as f:
                 mpd = json.load(f)
