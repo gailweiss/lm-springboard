@@ -2,6 +2,9 @@ from model.transformer.transformer import Transformer
 from create import make_model
 from save_load import load_model, get_datamodule
 from model_explorer import get_full_path
+from data.dataloader import DataParams
+from model.model_params import ModelParams
+from train.train_params import TrainParams
 
 
 def sync_model_params(requested_model_params, loaded_model_params):
@@ -56,4 +59,4 @@ def quick_data_grab(dataset_name, tokenizer_source_name="gpt2", verbose=False):
     dp = DataParams(dataset_name=dataset_name, debug_crop=500)
     mp = ModelParams(tokenizer_source_name=tokenizer_source_name)
     tp = TrainParams()
-    return make_datamodule(dp, mp, tp, verbose=verbose, keep_datamodule=False)
+    return get_datamodule(dp, mp, verbose=verbose, keep_datamodule=False)

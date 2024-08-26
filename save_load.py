@@ -50,8 +50,8 @@ def load_model_info(folder_name):
     return res
 
 
-def get_datamodule(data_params, model_params,
-                            verbose=True, keep_datamodule=False):
+def get_datamodule(data_params, model_params, verbose=True,
+                   keep_datamodule=False):
     data = get_existing_datamodule(data_params, model_params)
     if None is not data:
         return data
