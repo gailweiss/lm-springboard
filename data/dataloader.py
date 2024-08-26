@@ -46,6 +46,7 @@ class DataParams:
     lines_per_sample: int = 1
     max_seq_len: int = -1
 
+
 # dataset_name:
 #   Which dataset to load and train on. Current options:
 #       'ptb' (Penn Treebank, loads from Huggingface),
@@ -153,25 +154,34 @@ def get_existing_datamodule(data_params, model_params):
         return True
 
     set_synthetic_task_flag(data_params)
+    print("checking for existing datamodule")
     for p in datamodules_paths:
+        print("checking inside path:", p)
+        print("path contains:", glob.glob(f"{p}/*"))
         with_timestamps = glob.glob(f"{p}/{data_params.dataset_name}/*")
         for path in with_timestamps:
+            print("checking path:", path)
             with open(path_join(path, "model_params.json"), "r") as f:
                 mpd = json.load(f)
             with open(path_join(path, "data_params.json"), "r") as f:
                 dpd = json.load(f)
+            with open(path_join(path, f"dataloader_notes.json"), "r") as f:
+                notes = json.load(f)
+
             if is_match(dpd, mpd):
+                print("matched!")
                 return LMDataModule(None, None, None, None, from_folder=path)
+    print("no match!")
     return None
 
 
 class ForTorchDataSet:
     def __init__(self, lengths, indices):
         self.lengths = lengths
-        self.indices = indices
+        self.indices = torch.as_tensor(indices)
 
     def __getitem__(self, i):
-        return self.lengths[i], torch.as_tensor(self.indices[i])
+        return self.lengths[i], self.indices[i]
 
     def __len__(self):
         return len(self.lengths)
@@ -202,7 +212,7 @@ class LMDataModule(pl.LightningDataModule):
             self.max_seq_len = min(self.max_seq_len,
                                    self.data_params.max_seq_len)
 
-    def setup_from_folder(self, path):
+    def setup_from_folder(self, path):  
         with open(path_join(path, "model_params.json"), "r") as f:
             self.model_params = ModelParams(**json.load(f))
         with open(path_join(path, "data_params.json"), "r") as f:
@@ -210,9 +220,9 @@ class LMDataModule(pl.LightningDataModule):
         self.tokenizer = load_stored_tokenizer_if_exists(
             self.model_params.tokenizer_source_name, path, self.verbose_init)
         assert None is not self.tokenizer  
-        # can't be loading data without its tokenizer
+        # can't be loading tokenized data without its tokenizer
         self.set_max_seq_len()
-        
+
         with open(path_join(path, "dataloader_notes.json"), "r") as f:
             base_attrs = json.load(f)
         [setattr(self, an, base_attrs[an]) for an in base_attrs]
@@ -222,7 +232,7 @@ class LMDataModule(pl.LightningDataModule):
             indices = np.load(path_join(path, f"{sn}-indices.npy"))
             lengths = np.load(path_join(path, f"{sn}-lengths.npy"))
             setattr(self, sn, ForTorchDataSet(lengths, indices))
-        # any other properties?
+
         self.finalise_data()
 
     def prep_for_torch_datasets(self):
@@ -253,7 +263,7 @@ class LMDataModule(pl.LightningDataModule):
         for sn in ["train_samples", "test_samples", "val_samples"]:
             ds = getattr(self, sn)
             for a in ["lengths", "indices"]:
-                np.save(path_join(path, f"{sn}-{a}.npy"), getattr(ds, a),
+                np.save(path_join(path, f"{sn}-{a}.npy"), getattr(ds, a), 
                         allow_pickle=False)
 
     def setup_from_data_dict(self, samples):
@@ -290,12 +300,13 @@ class LMDataModule(pl.LightningDataModule):
                 msg = f"got synthetic sample longer than allowed: {len(s)}" +\
                       f" tokens (max allowed: {self.max_seq_len})"
                 assert len(s) <= self.max_seq_len, msg
+
             for i in range(0, len(s), self.max_seq_len):
                 def get_chunk(lst):
                     return lst[i:i + self.max_seq_len + 1]
+                    # +1 to have max_len + 1 tokens, as the first max_len are
+                    # input and the last max_len are prediction
                 schunk = get_chunk(s)
-                # +1 to have max_len + 1 tokens, as the first max_len are input
-                #  and the last max_len are prediction
 
                 # need at least 1 token and its next token
                 # to do LM training
@@ -304,12 +315,11 @@ class LMDataModule(pl.LightningDataModule):
         return res
 
     def print_data_desc(self, overall_list=None):
-        def av_len(lst):
-            return sum(len(s) for s in lst)/len(lst)
-
         def descstr(lst, n):
-            return f"{n}: {len(lst)} samples, avg: {av_len(lst)} tokens" +\
-                   f", max: {max([len(s) for s in lst])} tokens"
+            lengths = [len(s) for s in lst]
+            return f"{n}: {len(lst)} samples, avg: " +\
+                   f"{sum(lengths)/len(lengths)} tokens" +\
+                   f", max: {max(lengths)} tokens"
 
         if None is not overall_list:
             print(descstr(overall_list, "overall data"))
@@ -457,18 +467,15 @@ def mycollate(b):
     seqlen = max(lengths)
 
     batch_indices = torch.zeros((len(b), seqlen), dtype=dtype)
-    
+
     with_mask = len(set(lengths)) > 1
-    if with_mask:
-        mask = torch.ones(batch_indices.shape, dtype=dtype)
-    else:
-        mask = None
+    mask = torch.ones(batch_indices.shape, dtype=dtype) if with_mask else None
 
     for i, (n, seq) in enumerate(b):
         batch_indices[i][:n] = seq[:n]
         if with_mask:
             mask[i][:n] = 0
-        
+
     # indices shape: batch size X seq len
     # mask shape: batch size X seq len, or None. marks pads
     return {"x_indices": batch_indices, "mask": mask}
