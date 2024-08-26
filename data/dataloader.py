@@ -163,6 +163,18 @@ def get_existing_datamodule(data_params, model_params):
     return None
 
 
+class ForTorchDataSet:
+    def __init__(self, lengths, indices):
+        self.lengths = lengths
+        self.indices = indices
+
+    def __getitem__(self, i):
+        return self.lengths[i], torch.as_tensor(self.indices[i])
+
+    def __len__(self):
+        return len(self.lengths)
+
+
 class LMDataModule(pl.LightningDataModule):
     def __init__(self, data, tokenizer, data_params, model_params,
                  verbose_init=False, from_folder=None):
@@ -180,6 +192,7 @@ class LMDataModule(pl.LightningDataModule):
             self.setup_from_list(data)
         else:  # DatasetDict through huggingface
             self.setup_from_data_dict(data)
+        self.prep_for_torch_datasets()
 
     def set_max_seq_len(self):
         self.max_seq_len = self.model_params.max_seq_len
@@ -204,11 +217,23 @@ class LMDataModule(pl.LightningDataModule):
 
         # load train, test, val samples
         for sn in ["train_samples", "test_samples", "val_samples"]:
-            indices = np.load(path_join(path, f"{sn}.npy"))
-            samples = [s[1:s[0]+1] for s in indices]  # first value is length
-            setattr(self, sn, samples)
+            indices = np.load(path_join(path, f"{sn}-indices.npy"))
+            lengths = np.load(path_join(path, f"{sn}-lengths.npy"))
+            setattr(self, sn, ForTorchDataSet(lengths, indices))
         # any other properties?
         self.finalise_data()
+
+    def prep_for_torch_datasets(self):
+        def arranged(samples):
+            lengths = np.array([len(s) for s in samples])
+            indices = np.zeros((len(samples), lengths.max()), dtype=int)
+            for i, (n, inds) in enumerate(zip(lengths, samples)):
+                indices[i, :n] = inds
+            return lengths, indices
+
+        for sn in ["train_samples", "test_samples", "val_samples"]:
+            lengths, indices = arranged(getattr(self, sn))
+            setattr(self, sn, ForTorchDataSet(lengths, indices))
 
     def save_to_folder(self, path):
         prepare_directory(path)
@@ -223,20 +248,11 @@ class LMDataModule(pl.LightningDataModule):
         with open(path_join(path, f"data_params.json"), "w") as f:
             json.dump(vars(self.data_params), f)
 
-        # save data
-        def samples_as_array(samples):
-            # todo: make all the data be a numpy array in main dataloader, 
-            # probably easier on mycollate than these lists of lists
-            m = max(len(s) for s in samples)
-            indices = np.zeros((len(samples), m + 1), dtype=int)
-            for i, inds in enumerate(samples):
-                n = len(inds)
-                indices[i, : n + 1] = [n] + inds
-            return indices
-
         for sn in ["train_samples", "test_samples", "val_samples"]:
-            arr = samples_as_array(getattr(self,sn))
-            np.save(path_join(path, f"{sn}.npy"), arr, allow_pickle=False)
+            ds = getattr(self, sn)
+            for a in ["lengths", "indices"]:
+                np.save(path_join(path, f"{sn}-{a}.npy"), getattr(ds, a),
+                        allow_pickle=False)
 
     def setup_from_data_dict(self, samples):
         train_samples = samples["train"]
@@ -321,7 +337,6 @@ class LMDataModule(pl.LightningDataModule):
 
     def finalise_data(self):
         # for showing samples
-        self.data = self.train_samples + self.val_samples + self.test_samples
         self.train_n = len(self.train_samples)
         self.val_n = len(self.val_samples)
         self.test_n = len(self.test_samples)
@@ -337,12 +352,23 @@ class LMDataModule(pl.LightningDataModule):
         # when running on my mac for too many epochs (batches dont bother it
         # - epochs do). i dont need this
 
+    def get_sample(self, i):
+        datasets = [self.train_samples, self.val_samples, self.test_samples]
+        for ds in datasets:
+            if i < len(ds):
+                n, indices = ds[i]  # length, indices
+                return n, indices[:n]
+            i -= len(ds)
+        n = sum([len(ds) for ds in datasets])
+        raise Exception(f"no sample at index {i}, only have {n} samples")
+
     def get_sample_str(self, i=0):
-        return self.tokenizer.convert_ids_to_nice_string(self.data[i])
+        n, indices = self.get_sample(i)
+        return self.tokenizer.convert_ids_to_nice_string(indices)
 
     def show_sample(self, i=0):
-        s = self.data[i]
-        print(f"sample {i}, has {len(s)} tokens:")
+        n, indices = self.get_sample(i)
+        print(f"sample {i}, has {n} tokens:")
         print(self.get_sample_str(i))
 
     def train_dataloader(self, batch_size):
@@ -412,22 +438,25 @@ def verysimplesamplesreader(path, data_params):
 
 
 def mycollate(b):
-    # b: list of lists. each list in b is a list of indices, representing the
-    # tokens for a single sample
+    # b: list of samples. each sample is a tuple of:
+    # (int length, tensor of indices).
     dtype = torch.long
-    bos = b[0][0]  # first token of first sample,
-    lengths = [len(s) for s in b]
-
+    lengths = [s[0] for s in b]
     seqlen = max(lengths)
-    if len(set(lengths)) > 1:
-        batch_indices = torch.zeros((len(b), seqlen), dtype=dtype)
+
+    batch_indices = torch.zeros((len(b), seqlen), dtype=dtype)
+    
+    with_mask = len(set(lengths)) > 1
+    if with_mask:
         mask = torch.ones(batch_indices.shape, dtype=dtype)
-        for i, seq in enumerate(b):
-            batch_indices[i][:lengths[i]] = torch.tensor(seq, dtype=dtype)
-            mask[i][:lengths[i]] = 0
     else:
-        batch_indices = torch.tensor(b, dtype=dtype)
         mask = None
+
+    for i, (n, seq) in enumerate(b):
+        batch_indices[i][:n] = seq[:n]
+        if with_mask:
+            mask[i][:n] = 0
+        
     # indices shape: batch size X seq len
     # mask shape: batch size X seq len, or None. marks pads
     return {"x_indices": batch_indices, "mask": mask}
