@@ -78,12 +78,21 @@ def get_model_by_timestamp(timestamp, checkpoint=final_chkpt, verbose=True,
         if id2 in get_model_cache:   # data already loaded, no harm
             return get_model_cache[id2]
 
-
     p = get_full_path(timestamp, checkpoint=checkpoint)
     if None is p:
+        if verbose:
+            print("did not find path with timestamp:",timestamp)
         return None
+    if verbose:
+        print("found model path:",p)
 
     res = load_model(p, full=True, verbose=verbose, with_data=with_data)
+
+    if verbose:
+        if None is not res:
+            print("succesfully loaded model")
+        else:
+            print("failed to load model from path")
 
     if cache:
         if (timestamp, checkpoint, False) in get_model_cache:
