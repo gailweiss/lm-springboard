@@ -75,7 +75,9 @@ class DataParams:
 #   sets, respectively. Should be greater than 0 and sum to less than 100.
 #   The splitting of samples to train, val, and test sets according to these
 #   fractions happens *before* the samples are broken into smaller chunks
-#   according to the model's maximum input length.
+#   according to the model's maximum input length. Relevant only when data has
+#   not already been split into train/test/val by some other convention, e.g.
+#   by loading an already split dataset such as wikitext-103 from huggingface
 # is_synthetic_task:
 #   Value for internal use: any value set here will be ignored and
 #   overwritten by get_data.
@@ -301,6 +303,22 @@ class LMDataModule(pl.LightningDataModule):
                     res.append(schunk)
         return res
 
+    def print_data_desc(self, overall_list=None):
+        def av_len(lst):
+            return sum(len(s) for s in lst)/len(lst)
+
+        def descstr(lst, n):
+            return f"{n}: {len(lst)} samples, avg: {av_len(lst)} tokens" +\
+                   f", max: {max([len(s) for s in lst])} tokens"
+
+        if None is not overall_list:
+            print(descstr(overall_list, "overall data"))
+        
+        named_lists = [(self.train_samples, "train"), (self.val_samples, "val"),
+                        (self.test_samples, "test")]
+        for lst, n in named_lists:
+            print("\t", descstr(lst, n))
+
     def setup_from_list(self, samples, sizes=None,
                         force_no_split_shuffle=False):
         # force_no_split_shuffle: no shuffle overrides a shuffle before the
@@ -312,26 +330,20 @@ class LMDataModule(pl.LightningDataModule):
 
         # split without shuffling always for now, and beware of
         # force_no_split_shuffle if want to change later
-        self.train_samples = self.chunk_long_samples(data[:train_n])
-        self.val_samples = self.chunk_long_samples(data[train_n:
-                                                        train_n + val_n])
-        self.test_samples = self.chunk_long_samples(data[train_n + val_n:])
+        self.train_samples = data[:train_n]
+        self.val_samples = data[train_n: train_n + val_n]
+        self.test_samples = data[train_n + val_n:]
+        if self.verbose_init:
+            print("=== before chunking ===")
+            self.print_data_desc(overall_list=data)
+
+        self.train_samples = self.chunk_long_samples(self.train_samples)
+        self.val_samples = self.chunk_long_samples(self.val_samples)
+        self.test_samples = self.chunk_long_samples(self.test_samples)
 
         if self.verbose_init:
-            def av_len(lst):
-                return sum(len(s) for s in lst)/len(lst)
-
-            def descstr(lst, n):
-                return f"{n}: {len(lst)} samples, avg: {av_len(lst)} tokens" +\
-                       f", max: {max([len(s) for s in lst])} tokens"
-
-            data_descstr = descstr(data, "overall data")
-            named_lists = zip((self.train_samples, self.val_samples,
-                               self.test_samples), ('train', 'val', 'test'))
-            final_descstrs = "\n\t"+"\n\t".join([descstr(lst, n) for lst, n
-                                                in named_lists])
-            print(f"before chunking: {data_descstr}\n",
-                  f"after chunking: {final_descstrs}")
+            print("=== after chunking ===")
+            self.print_data_desc()
 
         self.finalise_data()
 
