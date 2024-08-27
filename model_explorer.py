@@ -236,7 +236,12 @@ def plot_metrics(timestamps, metric_names, title=None, folder_name=None):
                 continue  # eg if trying to show copy loss on several
                 # timestamps but one is just pairs
             d = t_info["train_stats"][m]
-            n_train_samples, metric, stat_indices = list(zip(*d))
+            if len(d[0]) == 3:  # older version
+                n_train_samples, metric, stat_counter = list(zip(*d))
+            else:  # newer version
+                stat_syncer, n_train_samples, stat_counter, metric = \
+                    list(zip(*d))
+            
             def label():
                 if single_metric:
                     if isinstance(timestamps, dict):

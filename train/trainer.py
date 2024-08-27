@@ -31,9 +31,11 @@ class Trainer(pl.LightningModule):
         # quite constrained in options
         self.last_checkpoint_i = -1
         self.last_checkpoint_nsamples = -1
+        self.stat_syncer = 0
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
+        
 
     def prepare_saver(self, dp, saving_folder, saving_function):
         self.dp = dp
@@ -73,10 +75,13 @@ class Trainer(pl.LightningModule):
             wandb.log({name: val})
         if name not in self.logged_stats_dict:
             self.logged_stats_dict[name] = []
-        self.stat_counter += 1
-        self.logged_stats_dict[name].append((self.n_train_samples,
-                                             val,
-                                             self.stat_counter))
+        self.stat_counter += 1  # increases with every single stat,
+        # unlike stat syncer, which increases exactly once at the beginning
+        # of every training step
+        self.logged_stats_dict[name].append((self.stat_syncer,
+                                             self.n_train_samples,
+                                             self.stat_counter,
+                                             val))
 
     def log_time(self):
         if None is not self.start_time:
@@ -157,6 +162,8 @@ class Trainer(pl.LightningModule):
             self.log_hyperparams_and_time()
 
     def training_step(self, batch, batch_idx):
+        self.stat_syncer += 1
+        self.log_stat("stat_syncer", self.stat_syncer)
         self.this_lm_total_batches += 1
         self.n_train_batches += 1
         self.maybe_log_hyperparams_and_time()
