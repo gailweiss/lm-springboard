@@ -90,7 +90,7 @@ class Trainer(pl.LightningModule):
         for sn in self.curr_train_stats_by_type:
             d = self.curr_train_stats_by_type[sn]
             for t, stats in d.items():
-                self.log_stat(f"train_{sn}:{t}", sum(stats) / len(stats))
+                self.log_stat(f"stat/train_{sn}:{t}", sum(stats) / len(stats))
             self.curr_train_stats_by_type[sn] = {}
         self.maybe_save_checkpoint(after_train_epoch=True)
 
@@ -103,7 +103,7 @@ class Trainer(pl.LightningModule):
         for sn in self.curr_val_stats_by_type:
             d = self.curr_val_stats_by_type[sn]
             for t, stats in d.items():
-                self.log_stat(f"val_{sn}:{t}", sum(stats) / len(stats))
+                self.log_stat(f"stat/val_{sn}:{t}", sum(stats) / len(stats))
             self.curr_val_stats_by_type[sn] = {}
 
         val_loss = sum(main) / len(main)
@@ -139,7 +139,7 @@ class Trainer(pl.LightningModule):
                 recording_dict[t].append(item(stats[t]))
         if from_train:
             for t in stats:
-                self.log_stat(f"train_batch_{stat_name}:{t}", item(stats[t]))
+                self.log_stat(f"stat/train_batch_{stat_name}:{t}", item(stats[t]))
 
     def curr_avg_lr(self):
         lrs = [pg['lr'] for pg in self.lr_schedulers().optimizer.param_groups]
