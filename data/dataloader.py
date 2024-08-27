@@ -215,9 +215,18 @@ class LMDataModule(pl.LightningDataModule):
 
     def setup_from_folder(self, path):  
         with open(path_join(path, "model_params.json"), "r") as f:
-            self.model_params = ModelParams(**json.load(f))
+            self.model_params = ModelParams()
+            mp = json.load(f)
+            [setattr(self.model_params, a, mp[a]) for a in mp]
+            # allows that mp may specify some additional things not in current
+            # model_params definition, if made by more specific branch. assumes
+            # these additional things only add information, but do not take
+            # away or modify anything needed here
         with open(path_join(path, "data_params.json"), "r") as f:
-            self.data_params = DataParams(**json.load(f))
+            self.data_params = DataParams()
+            dp = json.load(f)
+            [setattr(self.data_params, a, dp[a]) for a in dp]
+            # as with model_params above
         self.tokenizer = load_stored_tokenizer_if_exists(
             self.model_params.tokenizer_source_name, path, self.verbose_init)
         assert None is not self.tokenizer  
