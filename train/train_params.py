@@ -23,6 +23,7 @@ class TrainParams:
     lora_rank: int = 0
     lora_std: float = 0.02
     checkpoint_every: int = 0
+    early_stop_nsamples: int = -1
 
 # batch_size:
 #   The batch size used for the training and validation sets
@@ -98,3 +99,5 @@ class TrainParams:
 #   increased by >=n since last save).
 #   Relevant only when also passing --save through the args, otherwise will be
 #   overridden to 0.
+# early_stop_nsamples:
+#   When >0, the number of batches to train before early stopping the training.

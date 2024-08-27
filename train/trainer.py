@@ -162,6 +162,12 @@ class Trainer(pl.LightningModule):
         if self.n_opt_steps % freq == 0:
             self.log_hyperparams_and_time()
 
+    def on_train_batch_start(self, batch, batch_idx):
+        if self.train_params.early_stop_nsamples > 0:
+            if self.n_train_samples >= self.train_params.early_stop_nsamples:
+                return -1  # will stop the training, according to pytorch 
+                           # lightning
+
     def training_step(self, batch, batch_idx):
         self.stat_syncer += 1
         self.log_stat("stat_syncer", self.stat_syncer)
