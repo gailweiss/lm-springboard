@@ -2,3 +2,8 @@
 __pycache__/
 todo.txt
 *.ipynb
+configs/
+curr\ todo
+datamodules-paths.txt
+models-paths.txt
+rcplist.sh
