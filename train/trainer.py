@@ -12,10 +12,11 @@ class Trainer(pl.LightningModule):
         self.train_params = train_params
         self.curr_train_stats_by_type = {"loss": {}, "acc": {}}
         self.curr_val_stats_by_type = {"loss": {}, "acc": {}}
-        self.curr_steps_count = 0
         self.this_lm_total_batches = 0
         self.start_time = start_time  # should be obtained with process_time()
         self.n_train_samples = 0
+        self.n_train_batches = 0
+        self.n_opt_steps = 0
         self.stat_counter = -1
         self.logged_stats_dict = {}
         self.samples_at_validation = samples_at_validation
@@ -30,6 +31,9 @@ class Trainer(pl.LightningModule):
         # quite constrained in options
         self.last_checkpoint_i = -1
         self.last_checkpoint_nsamples = -1
+        self.log_stat("n_train_samples", self.n_train_samples)
+        self.log_stat("n_train_batches", self.n_train_batches)
+        self.log_stat("n_opt_steps", self.n_opt_steps)
 
     def prepare_saver(self, dp, saving_folder, saving_function):
         self.dp = dp
@@ -73,9 +77,6 @@ class Trainer(pl.LightningModule):
         self.logged_stats_dict[name].append((self.n_train_samples,
                                              val,
                                              self.stat_counter))
-
-    def on_train_epoch_start(self):
-        self.curr_steps_count = 0
 
     def log_time(self):
         if None is not self.start_time:
@@ -152,12 +153,12 @@ class Trainer(pl.LightningModule):
 
     def maybe_log_hyperparams_and_time(self):
         freq = self.train_params.hyperparams_log_freq
-        if self.curr_steps_count % freq == 0:
+        if self.n_opt_steps % freq == 0:
             self.log_hyperparams_and_time()
 
     def training_step(self, batch, batch_idx):
-        self.curr_steps_count += 1
         self.this_lm_total_batches += 1
+        self.n_train_batches += 1
         self.maybe_log_hyperparams_and_time()
         self.maybe_save_checkpoint()
         clear_gpu_caches()
@@ -172,8 +173,11 @@ class Trainer(pl.LightningModule):
 
         self.log("train_batch_loss", losses["main"].item())
         # for the lr scheduler
+
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
+        self.log_stat("n_train_batches", self.n_train_batches)
+        self.log_stat("n_opt_steps", self.n_opt_steps)
 
         self.manual_backward(losses["main"])
         self.maybe_step_opt_and_lr(batch_idx)
@@ -188,6 +192,7 @@ class Trainer(pl.LightningModule):
             opt.zero_grad()
             sched = self.lr_schedulers()
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
+            self.n_opt_steps += 1
 
     def validation_step(self, batch, batch_idx):
         la, n_samples = self.model.get_losses(batch, accs_too=True)
