@@ -96,7 +96,7 @@ class Trainer(pl.LightningModule):
         for sn in self.curr_train_stats_by_type:
             d = self.curr_train_stats_by_type[sn]
             for t, stats in d.items():
-                self.log_stat(f"stat/train_{sn}:{t}", sum(stats) / len(stats))
+                self.log_stat(f"stat/train_{sn}:{t}", wary_mean(stats))
             self.curr_train_stats_by_type[sn] = {}
         self.maybe_save_checkpoint(after_train_epoch=True)
 
@@ -109,10 +109,10 @@ class Trainer(pl.LightningModule):
         for sn in self.curr_val_stats_by_type:
             d = self.curr_val_stats_by_type[sn]
             for t, stats in d.items():
-                self.log_stat(f"stat/val_{sn}:{t}", sum(stats) / len(stats))
+                self.log_stat(f"stat/val_{sn}:{t}", wary_mean(stats))
             self.curr_val_stats_by_type[sn] = {}
 
-        val_loss = sum(main) / len(main)
+        val_loss = wary_mean(main)
         self.last_val_loss = val_loss  # might want this e.g. in model_explorer
         if self.samples_at_validation:
             print("====\ncurrent val loss:", val_loss, ", sampling: ====")
@@ -149,7 +149,7 @@ class Trainer(pl.LightningModule):
 
     def curr_avg_lr(self):
         lrs = [pg['lr'] for pg in self.lr_schedulers().optimizer.param_groups]
-        return -1 if not lrs else sum(lrs) / len(lrs)
+        return -1 if not lrs else wary_mean(lrs)
 
     def log_hyperparams_and_time(self):
         n_active_params = sum(p.numel() for p in
@@ -303,3 +303,9 @@ def clear_gpu_caches():
         torch.cuda.empty_cache()
     if hasattr(torch, "mps") and torch.backends.mps.is_available():
         torch.mps.empty_cache()
+
+def wary_mean(vals):
+    vals = [v for v in vals if None is not v]
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
