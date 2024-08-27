@@ -377,7 +377,8 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
 
 def get_full_path(timestamp, checkpoint=final_chkpt):
     paths = glob.glob("../saved-models/**/", recursive=True)
-    paths = [p for p in paths if (timestamp in p and p.endswith(f"/{checkpoint}/"))]
+    paths = [p for p in paths if (f"/{timestamp}/" in p and \
+                                  p.endswith(f"/{checkpoint}/"))]
     if len(paths) == 1:
         return paths[0]
     if len(paths) < 1:
