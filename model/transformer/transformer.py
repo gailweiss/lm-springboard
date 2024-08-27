@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from model.transformer.transformerencoderlayer import TransformerEncoderLayer
+from util import printer_print as print
 
 
 class Transformer(nn.Module):

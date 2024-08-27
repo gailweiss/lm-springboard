@@ -6,6 +6,7 @@ from torch import Tensor
 from torch.overrides import has_torch_function, handle_torch_function
 from torch.nn.functional import _mha_shape_check, _in_projection_packed, \
                                 _in_projection, linear, softmax, dropout
+from util import printer_print as print
 
 
 def multi_head_attention_forward(query, key, value, num_heads, QKV, dropout_p,

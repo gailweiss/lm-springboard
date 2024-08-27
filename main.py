@@ -9,7 +9,9 @@ import lightning as pl
 import argparse
 from dataclasses import asdict
 import wandb
-from util import get_timestamp, print_nicely_nested, in_try
+from util import get_timestamp, print_nicely_nested, in_try, \
+                 prepare_directory, printer
+from util import printer_print as print
 from save_load import save_model as save_model_
 from save_load import final_chkpt
 from setup import setup_model_and_data
@@ -19,6 +21,7 @@ import glob
 import ast
 from time import process_time, sleep
 import os
+from os.path import join as path_join
 
 # not trying to parallelize the tokenizer, i tokenize everything first and then
 # load tokens (not sequences) later. (may want to change this in future, if
@@ -182,7 +185,7 @@ def finish_wandb(args, tp, run, run_loc):
             shutil.rmtree(run_loc)
         except Exception as e:
             print("couldnt delete wandb log at:", run_loc,
-                  " -- got exception:\n", e)
+                " -- got exception:\n", e)
 
 
 def show_sample(lm):
@@ -207,16 +210,26 @@ def save_model(args, saving_folder, pltrainer, dp, tp):
 def run_config(args, dp, tp, mp, namer):
     full_params = build_full(dp, tp, mp)
     run, run_name, run_loc = setup_wandb(args, tp, full_params, namer)
+    saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
+    if args.save or args.save_stats:
+        prepare_directory(saving_folder)
+        f = open(path_join(saving_folder, "log.txt"), "w")
+        printer.add_output_file(f)
+
     print("going to train from config: [", args.config,
-          "], using the following parameters:")
+                  "], using the following parameters:")
     print_nicely_nested(full_params)
     lm, dataset = setup_model_and_data(dp, mp, tp, 
                                       keep_datamodule=args.keep_datamodule)
-    saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
+    
     pltrainer = train(args, lm, dataset, tp, dp, saving_folder)
     show_sample(pltrainer.model.model)
     save_model(args, saving_folder, pltrainer, dp, tp)
     finish_wandb(args, tp, run, run_loc)
+
+    if args.save or args.save_stats:
+        f.close()
+        printer.remove_output_file(f)
     if hasattr(torch, "mps") and torch.backends.mps.is_available():
         torch.mps.empty_cache()
 

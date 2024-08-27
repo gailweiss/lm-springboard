@@ -4,6 +4,7 @@ import tokenizers
 from transformers import PreTrainedTokenizerFast
 from tqdm import tqdm
 import json
+from util import printer_print as print
 
 
 @timed

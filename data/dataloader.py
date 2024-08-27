@@ -12,6 +12,7 @@ from model.model_params import ModelParams
 import numpy as np
 from util import prepare_directory
 import json
+from util import printer_print as print
 
 
 try:

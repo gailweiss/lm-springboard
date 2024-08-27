@@ -5,6 +5,7 @@ from model_explorer import get_full_path
 from data.dataloader import DataParams
 from model.model_params import ModelParams
 from train.train_params import TrainParams
+from util import printer_print as print
 
 
 def sync_model_params(requested_model_params, loaded_model_params):

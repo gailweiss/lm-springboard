@@ -7,6 +7,7 @@ import torch
 from util import prepare_directory, get_timestamp, glob_nosquares
 import sys
 from os.path import join as path_join
+from util import printer_print as print
 
 
 def auto_timestamps():

@@ -24,6 +24,38 @@ class GlobalTimingDepth:
 TheTimingDepth = GlobalTimingDepth()
 
 
+class Printer:
+    # can probably do this with logging module but long docs and just need this
+    def __init__(self, prints_to_stdout=True):
+        self.prints_to_stdout = prints_to_stdout
+        self.other_files = []
+
+    def add_output_file(self, file):
+        self.other_files.append(file)
+
+    def remove_output_file(self, file):
+        self.other_files = [f for f in self.other_files if f is not file]
+
+    def print(self, *args, **kwargs):
+        all_files = self.other_files
+        if self.prints_to_stdout:
+            all_files = all_files + [sys.stdout]
+        if "file" in kwargs:
+            all_files = all_files + [kwargs["file"]]
+        all_files = set(all_files)  # in case got a duplicate eg through kwargs
+        kwargs = {n: v for n, v in kwargs.items() if not n == "file"}
+        for f in all_files:
+            if not f.closed:
+                print(*args, file=f, **kwargs)
+
+
+printer = Printer()
+
+
+def printer_print(*args, **kwargs):
+    printer.print(*args, **kwargs)
+
+
 def timed(f):
     def timed_f(*a, _timed_f_silent=False, **kw):
         TheTimingDepth.d += 1
@@ -31,8 +63,8 @@ def timed(f):
         res = f(*a, **kw)
         total = process_time() - start
         if not _timed_f_silent:
-            print("TIME:", (" " * 4 * TheTimingDepth.d) + f.__name__, "took:",
-                  total, "s")
+            printer_print("TIME:", (" " * 4 * TheTimingDepth.d) + f.__name__,
+                          "took:", total, "s", flush=True)
         TheTimingDepth.d -= 1
         return res
     return timed_f
@@ -43,9 +75,9 @@ def in_try(f):
         try:
             return f(*a, **kw)
         except Exception as e:
-            print(f"\n\n\n!!!!!!\n" +
-                  f"running {f.__name__} hit exception:\n {e}\n\n" +
-                  "!!!!!!!!!!!!!\n\n\n")
+            printer_print(f"\n\n\n!!!!!!\n" +
+                f"running {f.__name__} hit exception:\n {e}\n\n" +
+                "!!!!!!!!!!!!!\n\n\n")
             return e
     return tried_f
 
@@ -114,7 +146,7 @@ def prepare_directory(path):
     if len(path) == 0:
         return
     if not os.path.exists(path):
-        # print("making path:",path)
+        # printer_print("making path:",path)
         os.makedirs(path)
 
 
@@ -148,7 +180,7 @@ def print_nicely_nested(d, file=sys.stdout, skip_first=True, indent=" " * 8,
 
     def print_nested(d, n_indents=0):
         def print_simply(a):
-            print(f"{indents(n_indents)}{a}", file=file)
+            printer_print(f"{indents(n_indents)}{a}", file=file)
         if is_simple(d):
             print_simply(d)
             return

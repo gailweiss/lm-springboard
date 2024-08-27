@@ -2,6 +2,7 @@ import lightning as pl
 import torch
 import wandb
 from time import process_time
+from util import printer_print as print
 
 
 class Trainer(pl.LightningModule):
