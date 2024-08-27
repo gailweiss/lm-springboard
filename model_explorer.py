@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from save_load import load_model, load_model_info, final_chkpt
+from save_load import load_model, load_model_info, final_chkpt, models_paths
 import glob
 import lightning as pl
 from train.trainer import Trainer
@@ -9,6 +9,8 @@ import sys
 from os.path import join as path_join
 from util import printer_print as print
 
+assert False not in [p.endswith("/saved-models") for p in models_paths]
+# "task_name" function in auto_timestamps makes this assumption, so be sure
 
 def auto_timestamps():
     def is_timestamp(sample):
@@ -24,7 +26,7 @@ def auto_timestamps():
         return True
     
     def task_name(path):
-        path = path.split("../saved-models/")[1]
+        path = path.split("/saved-models/")[1]
         # config = path.split("/")[0]
         return path.split("/")[1]
     
@@ -34,8 +36,9 @@ def auto_timestamps():
     def last_is_timestamp(path):
         return is_timestamp(last_folder(path))
     
-    # a = glob.glob("../saved-models/**", recursive=True)[4].split("/")[-1]
-    all_paths = glob.glob("../saved-models/**", recursive=True)
+    all_paths = []
+    for p in models_paths:
+        all_paths += glob.glob(f"{p}/**", recursive=True)
     all_paths = [p for p in all_paths if last_is_timestamp(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
     res = {}
@@ -47,7 +50,9 @@ def auto_timestamps():
 
 
 def checkpoint_ids(timestamp):
-    all_paths = glob.glob("../saved-models/**", recursive=True)
+    all_paths = []
+    for p in models_paths:
+        all_paths += glob.glob(f"{p}/**", recursive=True)
     folder = next(p for p in all_paths if p.endswith(f"/{timestamp}"))
     def is_checkpoint_folder(p):
         bits = p.split(f"/{timestamp}/")
@@ -376,7 +381,9 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
             fig.savefig(f"{folder_name}/{nsamples}")
 
 def get_full_path(timestamp, checkpoint=final_chkpt):
-    paths = glob.glob("../saved-models/**/", recursive=True)
+    paths = []
+    for p in models_paths:
+        paths += glob.glob(f"{p}/**/", recursive=True)
     paths = [p for p in paths if (f"/{timestamp}/" in p and \
                                   p.endswith(f"/{checkpoint}/"))]
     if len(paths) == 1:
@@ -388,3 +395,24 @@ def get_full_path(timestamp, checkpoint=final_chkpt):
         print("found multiple model folders with:", timestamp, checkpoint)
         print(paths)
         return None
+
+
+def have_same_tokenization(lm1, lm2, datamodule, n_checks):
+    for i in range(n_checks):
+        sample_str = datamodule.get_sample_str(i)
+        i1, i2 = lm1.tokenizer(sample_str), lm2.tokenizer(sample_str)
+        if i1 != i2:
+            return False
+    return True
+
+
+def just_last_stats(model_stats):
+    def single_stat(s):
+        if not isinstance(s, list):
+            return s
+        s = s[-1]
+        if len(s) == 3:
+            return s[1]  # older version: main metric in middle of tuple
+        else:
+            return s[-1]  # now main metric in last pos
+    return {n: single_stat(s) for n, s in model_stats.items()}

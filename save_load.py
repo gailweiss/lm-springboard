@@ -9,6 +9,18 @@ from model.model_params import ModelParams
 from model.tokenizer import load_stored_tokenizer_if_exists
 from data.dataloader import DataParams, get_existing_datamodule
 import glob
+from util import printer_print as print
+
+
+try:
+    with open("models-paths.txt", "r") as f:
+        models_paths = f.readlines()
+        # e.g. ../saved-models, or more complicated if using cloud services
+        models_paths = [l.strip("\n") for l in models_paths if not
+                             l.startswith("#")]
+except Exception as e:
+    print("couldnt find extra models paths")
+    models_paths = "../saved-models"
 
 
 final_chkpt = "final"
@@ -30,7 +42,7 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
 
 
 def load_model_info(folder_name):
-    if Path(folder_name).exists() is False:
+    if not Path(folder_name).exists():
         raise ValueError(f"Folder {folder_name} does not exist")
 
     res = {"params": {}}
