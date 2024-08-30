@@ -422,3 +422,25 @@ def just_last_stats(model_stats):
         else:
             return s[-1]  # now main metric in last pos
     return {n: single_stat(s) for n, s in model_stats.items()}
+
+
+def same_characteristics(timestamps, mp=True, tp=True, dp=True, ignorable=None):
+    if not timestamps:
+        return True
+    infos = [(t, load_model_info(get_full_path(t))) for t in timestamps]
+    to_check = (["model_params"] if mp else []) + \
+               (["train_params"] if tp else []) + \
+               (["data_params"] if dp else [])
+    for pn in to_check:
+        tparams = [(t, i["params"][pn]) for (t, i) in infos]
+        t0, params0 = tparams[0]
+        for k, v in vars(params0).items():
+            if None is not ignorable and k in ignorable:
+                continue
+            for t, p in tparams[1:]:
+                p = vars(p)
+                if p[k] != v:
+                    print(f"mismatch between {get_full_path(t0)} and",
+                          f"{get_full_path(t)} on value {k}: {v} vs {p[k]}")
+                    return False
+    return True
