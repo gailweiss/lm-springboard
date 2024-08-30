@@ -206,7 +206,7 @@ def verify_stable_load(timestamp, checkpoint=final_chkpt):
     print("passed basic load checks")
 
 
-def plot_metrics(timestamps, metric_names, title=None, folder_name=None):
+def plot_metrics(timestamps, metric_names, title=None, filename=None):
     # timestamps can be a dict giving the timestamps special names for 
     # the plot labels, or just an iterable with the timestamps of interest
     # (in which case they will be labeled by their task name)
@@ -271,10 +271,11 @@ def plot_metrics(timestamps, metric_names, title=None, folder_name=None):
     ax.legend(markerscale=3)
     fig = plt.gcf()
     fig.show()
-    if None is not folder_name:
-        f = f"../metrics/{folder_name}"
-        prepare_directory(f)
-        fig.savefig(f"{f}/{metric_name}.png")
+    if None is not filename:
+        f = f"../metrics/{filename}"
+        directory = '/'.join(f.split('/')[:-1])
+        prepare_directory(directory)
+        fig.savefig(f"{f}.png")
 
 
 def compute_validation(lm, dataset, params, sample=True):
