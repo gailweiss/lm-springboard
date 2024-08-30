@@ -7,6 +7,8 @@ from util import prepare_directory, get_timestamp, glob_nosquares
 import sys
 from os.path import join as path_join
 from util import printer_print as print
+import json
+
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
 # "task_name" function in auto_timestamps makes this assumption, so be sure
@@ -25,9 +27,13 @@ def auto_timestamps():
         return True
     
     def task_name(path):
-        path = path.split("/saved-models/")[1]
-        # config = path.split("/")[0]
-        return path.split("/")[1]
+        try:
+            with open(path_join(path,final_chkpt,"data_params.json"), "r") as f:
+                a = json.load(f)
+            return a["dataset_name"]
+        except Exception as e:
+            print(e)
+            return None
     
     def last_folder(path):
         return path.split("/")[-1]
@@ -40,6 +46,7 @@ def auto_timestamps():
         all_paths += glob_nosquares(f"{p}/**", recursive=True)
     all_paths = [p for p in all_paths if last_is_timestamp(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
+    all_tuples = [t for t in all_tuples if None is not t]
     res = {}
     for tn, ts, p in all_tuples:
         if tn not in res:
