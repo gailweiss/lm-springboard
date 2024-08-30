@@ -268,7 +268,7 @@ def plot_metrics(timestamps, metric_names, title=None, folder_name=None):
                     res = res[1:]
                 return res
             plt.scatter(n_train_samples, metric, s=0.5, label=label())
-    ax.legend()
+    ax.legend(markerscale=3)
     fig = plt.gcf()
     fig.show()
     if None is not folder_name:
