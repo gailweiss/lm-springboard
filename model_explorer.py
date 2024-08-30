@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 from save_load import load_model, load_model_info, final_chkpt, models_paths
-import glob
 import lightning as pl
 from train.trainer import Trainer
 import torch
@@ -38,7 +37,7 @@ def auto_timestamps():
     
     all_paths = []
     for p in models_paths:
-        all_paths += glob.glob(f"{p}/**", recursive=True)
+        all_paths += glob_nosquares(f"{p}/**", recursive=True)
     all_paths = [p for p in all_paths if last_is_timestamp(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
     res = {}
@@ -52,7 +51,7 @@ def auto_timestamps():
 def checkpoint_ids(timestamp):
     all_paths = []
     for p in models_paths:
-        all_paths += glob.glob(f"{p}/**", recursive=True)
+        all_paths += glob_nosquares(f"{p}/**", recursive=True)
     folder = next(p for p in all_paths if p.endswith(f"/{timestamp}"))
     def is_checkpoint_folder(p):
         bits = p.split(f"/{timestamp}/")
@@ -383,7 +382,7 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
 def get_full_path(timestamp, checkpoint=final_chkpt):
     paths = []
     for p in models_paths:
-        paths += glob.glob(f"{p}/**/", recursive=True)
+        paths += glob_nosquares(f"{p}/**/", recursive=True)
     paths = [p for p in paths if (f"/{timestamp}/" in p and \
                                   p.endswith(f"/{checkpoint}/"))]
     if len(paths) == 1:

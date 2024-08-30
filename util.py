@@ -224,7 +224,7 @@ def get_nested_param(module, full_param_name):
     return reduce(getattr, names, module)
 
 
-def glob_nosquares(p):
+def glob_nosquares(p, **kw):
     # glob interprets pair of square brackets as describing range of tokens,
     # so cannot directly glob a filename with square bracket pairs in it.
     # but can turn each [ and ] into the range containing only [ or ], i.e.
@@ -232,4 +232,4 @@ def glob_nosquares(p):
     # applications in second replace
     p = p.replace("[","§[§").replace("]","§]§")
     p = p.replace("§[§","[[]").replace("§]§","[]]")
-    return glob.glob(p)
+    return glob.glob(p, **kw)

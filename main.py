@@ -10,14 +10,13 @@ import argparse
 from dataclasses import asdict
 import wandb
 from util import get_timestamp, print_nicely_nested, in_try, \
-                 prepare_directory, printer
+                 prepare_directory, printer, glob_nosquares
 from util import printer_print as print
 from save_load import save_model as save_model_
 from save_load import final_chkpt
 from setup import setup_model_and_data
 import shutil
 from copy import deepcopy
-import glob
 import ast
 from time import process_time, sleep
 import os
@@ -248,8 +247,8 @@ def all_config_variants(params):
 
 
 def get_config_filenames(config_name):
-    res = glob.glob(f"configs/{config_name}-*.txt") +\
-           glob.glob(f"configs/{config_name}.txt")
+    res = glob_nosquares(f"configs/{config_name}-*.txt") +\
+           glob_nosquares(f"configs/{config_name}.txt")
     return sorted(res)
     # sorted: in case numbered them and want it to run in that order.
     # note that it will go in lexicographic order so 10 will run

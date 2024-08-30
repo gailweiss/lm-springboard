@@ -5,12 +5,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 import datasets
 from data.syntheticdata import syntheticdatasets
-import glob
 from os.path import join as path_join
 from model.tokenizer import load_stored_tokenizer_if_exists
 from model.model_params import ModelParams
 import numpy as np
-from util import prepare_directory
+from util import prepare_directory, glob_nosquares
 import json
 from util import printer_print as print
 
@@ -102,9 +101,9 @@ def set_synthetic_task_flag(data_params):
 def get_local_datafolder(n):
     if None is datapath:
         return None
-    ps = glob.glob(f"{datapath}/*") +\
-        glob.glob(f"{datapath}/*/*") +\
-        glob.glob(f"{datapath}/*/*/*")
+    ps = glob_nosquares(f"{datapath}/*") +\
+        glob_nosquares(f"{datapath}/*/*") +\
+        glob_nosquares(f"{datapath}/*/*/*")
     dd = f"{datapath}/"
     return next((p for p in ps if dd.join(p.split(dd)[1:]) == n), None)
 
@@ -158,8 +157,8 @@ def get_existing_datamodule(data_params, model_params):
     print("checking for existing datamodule")
     for p in datamodules_paths:
         print("checking inside path:", p)
-        print("path contains:", glob.glob(f"{p}/*"))
-        with_timestamps = glob.glob(f"{p}/{data_params.dataset_name}/*")
+        print("path contains:", glob_nosquares(f"{p}/*"))
+        with_timestamps = glob_nosquares(f"{p}/{data_params.dataset_name}/*")
         for path in with_timestamps:
             print("checking path:", path)
             with open(path_join(path, "model_params.json"), "r") as f:
@@ -455,7 +454,7 @@ def wikitextloader():
 
 
 def verysimplesamplesreader(path, data_params):
-    paths = glob.glob(f"{path}/*.txt")
+    paths = glob_nosquares(f"{path}/*.txt")
     all_samples = []
     for p in paths:
         with open(p, "r") as f:
