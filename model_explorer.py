@@ -158,7 +158,7 @@ def clear_chkpts_cache():
 info_cache = {}
 
 
-def get_info(timestamp):
+def get_info(timestamp):  # always caches, info is small
     if timestamp in info_cache:
         return info_cache[timestamp]
     path = get_full_path(timestamp, checkpoint=final_chkpt)
@@ -206,7 +206,83 @@ def verify_stable_load(timestamp, checkpoint=final_chkpt):
     print("passed basic load checks")
 
 
-def plot_metrics(timestamps, metric_names, title=None, filename=None):
+def _longest_common_prefix(strings):
+    for (i, vals) in enumerate(zip(*strings)):
+        if len(set(vals)) > 1:
+            return strings[0][:i]
+    return strings[0][:i+1]
+
+
+def _ylabel(metric_names):
+    if len(metric_names) == 1:
+        if isinstance(metric_names, dict):
+            return metric_names[metric_names.keys()[0]]
+        else:
+            return metric_names[0]
+    if isinstance(metric_names, list):
+        res = _longest_common_prefix(metric_names)
+    if isinstance(metric_names, dict):
+        res = _longest_common_prefix(
+            [short_name for full_name, short_name in metric_names.items()])
+    while res.endswith("/") or res.endswith("|"):
+        res = res[:-1]
+    return res if res else "metric"
+
+
+def _plt_title(title, metric_names, timestamps):
+    if None is not title:
+        return title
+    single_timestamp = len(timestamps) == 1
+    if len(metric_names) == 1:
+        i = 0 if isinstance(metric_names, list) else metric_names.keys()[0]
+        return metric_names[i]
+    if single_timestamp and isinstance(timestamps, list):
+        return get_info(
+            timestamps[0])["params"]["data_params"].dataset_name
+    if single_timestamp and isinstance(timestamps, dict):
+        return timestamps[timestamps.keys()[0]]
+    # multi metrics, multi timestamps
+    all_ds_names = [get_info(t)["params"]["data_params"].dataset_name for \
+                    t in timestamps]
+    if len(set(all_ds_names)) == 1:
+        return all_ds_names[0]
+    raise Exception("given multiple tasks and multiple metrics",
+                    "please provide title for plot")
+
+
+def _line_label(timestamp, metric, timestamps, metric_names, ylabel):
+    if isinstance(timestamps, dict):
+        # timestamps have been given with labels for plot
+        ts_label = timestamps[timestamp]
+    else:
+        t_info = get_info(timestamp)
+        ts_label = t_info["params"]["data_params"].dataset_name
+    
+    if len(metric_names) == 1:
+        return ts_label
+
+    metric_label = metric_names[metric] if \
+        isinstance(metric_names, dict) else metric 
+    if metric_label.startswith(ylabel):
+        metric_label = metric_label[len(ylabel):]
+    while metric_label.startswith("/") or metric_label.startswith("|"):
+        metric_label = metric_label[1:]
+    
+    if len(timestamps) == 1:
+        return metric_label
+
+    return f"{ts_label}::{metric_label}"
+
+
+def _plot(x, y, s=0.5, label=None, plot_type="scatter"):
+    if plot_type == "scatter":
+        plt.scatter(x, y, s=s, label=label)
+    elif plot_type == "line":
+        plt.plot(x, y, label=label)
+
+
+def plot_metrics(timestamps, metric_names, title=None, filename=None,
+                 add_to=None, plot_type="scatter"):
     # timestamps can be a dict giving the timestamps special names for 
     # the plot labels, or just an iterable with the timestamps of interest
     # (in which case they will be labeled by their task name)
@@ -214,33 +290,17 @@ def plot_metrics(timestamps, metric_names, title=None, filename=None):
         timestamps = [timestamps]
     if isinstance(metric_names, str):
         metric_names = [metric_names]
-    
-    msg = "cant have multiple metrics and timestamps"
-    assert 1 in [len(timestamps), len(metric_names)], msg
+        
+    print("printing plots from models from folders:")
+    for t in timestamps:
+        print(t, get_full_path(t))
 
-    single_metric = len(metric_names) == 1 
-    
-    def ylabel_():
-        if single_metric:
-            return metric_names[0]
-        prefs = list(set(m.split("/")[0] for m in metric_names))
-        if len(prefs) == 1:
-            return prefs[0]
-        return "metric"
-
-    def plt_title():
-        if None is not title:
-            return title
-        if single_metric:
-            return metric_names[0]
-        # not single metric -> necessarily single task
-        return get_info(timestamps[0])["params"]["data_params"].dataset_name
-
-    ylabel = ylabel_()
-    fig, ax = plt.subplots()
+    ylabel = _ylabel(metric_names)
+    fig, ax = plt.subplots() if None is add_to else add_to
     plt.xlabel("n_train_samples")        
     plt.ylabel(ylabel)
-    plt.title(plt_title())
+    plt.title(_plt_title(title, metric_names, timestamps))
+    
     for t in timestamps:
         for m in metric_names:
             t_info = get_info(t)
@@ -253,29 +313,24 @@ def plot_metrics(timestamps, metric_names, title=None, filename=None):
             else:  # newer version
                 stat_syncer, n_train_samples, stat_counter, metric = \
                     list(zip(*d))
-            
-            def label():
-                if single_metric:
-                    if isinstance(timestamps, dict):
-                        # timestamps have been given with labels for plot
-                        return timestamps[t]
-                    return t_info["params"]["data_params"].dataset_name
-                # else, single task, multiple metrics
-                res = m
-                if res.startswith(ylabel):
-                    res = res[len(ylabel):]
-                if res.startswith("/"):
-                    res = res[1:]
-                return res
-            plt.scatter(n_train_samples, metric, s=0.5, label=label())
+            _plot(n_train_samples, metric, plot_type=plot_type,
+                label=_line_label(t, m, timestamps, metric_names, ylabel))
+
     ax.legend(markerscale=3)
     fig = plt.gcf()
     fig.show()
     if None is not filename:
-        f = f"../metrics/{filename}"
-        directory = '/'.join(f.split('/')[:-1])
+        fn = f"../metrics/{filename}"
+        directory = '/'.join(fn.split('/')[:-1])
         prepare_directory(directory)
-        fig.savefig(f"{f}.png")
+        fig.savefig(f"{fn}.png")
+        with open(f"{fn}.txt", "w") as f:
+            print(f"plot in {fn} made from timestamps:{timestamps}\n",
+                  f"and metrics:\n{metric_names}",file=f)
+            print("timestamp full paths:\n",file=f)
+            for t in timestamps:
+                print(t,"\t:",get_full_path(t),"\n",file=f)
+    return fig, ax
 
 
 def compute_validation(lm, dataset, params, sample=True):
