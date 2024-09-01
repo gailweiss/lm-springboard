@@ -26,25 +26,21 @@ TheTimingDepth = GlobalTimingDepth()
 
 class Printer:
     # can probably do this with logging module but long docs and just need this
-    def __init__(self, prints_to_stdout=True):
-        self.prints_to_stdout = prints_to_stdout
+    def __init__(self):
         self.other_files = []
 
     def add_output_file(self, file):
-        self.other_files.append(file)
+        self.other_files = list(set(self.other_files + [file]))
 
     def remove_output_file(self, file):
         self.other_files = [f for f in self.other_files if f is not file]
 
     def print(self, *args, **kwargs):
-        all_files = self.other_files
-        if self.prints_to_stdout:
-            all_files = all_files + [sys.stdout]
-        if "file" in kwargs:
-            all_files = all_files + [kwargs["file"]]
-        all_files = set(all_files)  # in case got a duplicate eg through kwargs
+        print_files = self.other_files
+        print_files = print_files + [kwargs.get("file", sys.stdout)] 
+        print_files = set(print_files)  # in case of duplicates
         kwargs = {n: v for n, v in kwargs.items() if not n == "file"}
-        for f in all_files:
+        for f in print_files:
             if not f.closed:
                 print(*args, file=f, **kwargs)
 

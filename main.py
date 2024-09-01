@@ -21,6 +21,7 @@ import ast
 from time import process_time, sleep
 import os
 from os.path import join as path_join
+import sys
 
 # not trying to parallelize the tokenizer, i tokenize everything first and then
 # load tokens (not sequences) later. (may want to change this in future, if
