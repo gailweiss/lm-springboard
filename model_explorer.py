@@ -274,7 +274,15 @@ def _line_label(timestamp, metric, timestamps, metric_names, ylabel):
     return f"{ts_label}::{metric_label}"
 
 
-def _plot(x, y, s=0.5, label=None, plot_type="scatter"):
+def _plot(x, y, s=0.5, label=None, plot_type="scatter",
+          max_x=None, min_x=None, max_y=None, min_y=None):
+    def keep(vx, vy):
+        return (vx < max_x) and (vx > min_x) and (vy < max_y) and (vy > min_y)
+    max_x = max_x if None is not max_x else torch.inf
+    min_x = min_x if None is not min_x else -torch.inf
+    max_y = max_y if None is not max_y else torch.inf
+    min_y = min_y if None is not min_y else -torch.inf
+    x, y = list(zip(*[(vx, vy) for vx, vy in zip(x, y) if keep(vx, vy)]))
     if plot_type == "scatter":
         plt.scatter(x, y, s=s, label=label)
     elif plot_type == "line":
@@ -282,7 +290,8 @@ def _plot(x, y, s=0.5, label=None, plot_type="scatter"):
 
 
 def plot_metrics(timestamps, metric_names, title=None, filename=None,
-                 add_to=None, plot_type="scatter"):
+                 add_to=None, plot_type="scatter", 
+                 max_x=None, min_x=None, max_y=None, min_y=None):
     # timestamps can be a dict giving the timestamps special names for 
     # the plot labels, or just an iterable with the timestamps of interest
     # (in which case they will be labeled by their task name)
@@ -313,7 +322,8 @@ def plot_metrics(timestamps, metric_names, title=None, filename=None,
             else:  # newer version
                 stat_syncer, n_train_samples, stat_counter, metric = \
                     list(zip(*d))
-            _plot(n_train_samples, metric, plot_type=plot_type,
+            _plot(n_train_samples, metric, plot_type=plot_type, 
+                max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
                 label=_line_label(t, m, timestamps, metric_names, ylabel))
 
     ax.legend(markerscale=3)
