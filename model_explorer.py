@@ -51,7 +51,6 @@ def auto_identifiers():
     all_paths = [p for p in all_paths if last_is_identifier(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
     all_tuples = [t for t in all_tuples if None is not t]
-    print(all_tuples[:3])
     res = {}
     for tn, ts, p in all_tuples:
         if tn not in res:
