@@ -214,6 +214,8 @@ def _longest_common_prefix(strings):
 
 
 def _ylabel(metric_names):
+    if not metric_names:
+        return None
     if len(metric_names) == 1:
         if isinstance(metric_names, dict):
             return metric_names[metric_names.keys()[0]]
@@ -274,8 +276,9 @@ def _line_label(timestamp, metric, timestamps, metric_names, ylabel):
     return f"{ts_label}::{metric_label}"
 
 
-def _plot(x, y, s=0.5, label=None, plot_type="scatter",
-          max_x=None, min_x=None, max_y=None, min_y=None):
+def _plot(ax, x, y, s=0.5, label=None, plot_type="scatter",
+          max_x=None, min_x=None, max_y=None, min_y=None,
+          extra_kwargs=None):
     def keep(vx, vy):
         return (vx < max_x) and (vx > min_x) and (vy < max_y) and (vy > min_y)
     max_x = max_x if None is not max_x else torch.inf
@@ -283,13 +286,15 @@ def _plot(x, y, s=0.5, label=None, plot_type="scatter",
     max_y = max_y if None is not max_y else torch.inf
     min_y = min_y if None is not min_y else -torch.inf
     x, y = list(zip(*[(vx, vy) for vx, vy in zip(x, y) if keep(vx, vy)]))
+    extra_kwargs = {} if None is extra_kwargs else extra_kwargs
     if plot_type == "scatter":
-        plt.scatter(x, y, s=s, label=label)
+        return ax.scatter(x, y, s=s, label=label, **extra_kwargs)
     elif plot_type == "line":
-        plt.plot(x, y, label=label)
+        return ax.plot(x, y, label=label, **extra_kwargs)[0]
 
 
-def plot_metrics(timestamps, metric_names, title=None, filename=None,
+def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
+                 title=None, filename=None, colors=None,
                  add_to=None, plot_type="scatter", 
                  max_x=None, min_x=None, max_y=None, min_y=None):
     # timestamps can be a dict giving the timestamps special names for 
@@ -297,36 +302,68 @@ def plot_metrics(timestamps, metric_names, title=None, filename=None,
     # (in which case they will be labeled by their task name)
     if isinstance(timestamps, str):
         timestamps = [timestamps]
-    if isinstance(metric_names, str):
-        metric_names = [metric_names]
+    if isinstance(metric_names_ax1, str):
+        metric_names_ax1 = [metric_names_ax1]
+    if isinstance(metric_names_ax2, str):
+        metric_names_ax2 = [metric_names_ax2]
+    if None is metric_names_ax2:
+        metric_names_ax2 = []
         
     print("printing plots from models from folders:")
     for t in timestamps:
         print(t, get_full_path(t))
 
-    ylabel = _ylabel(metric_names)
-    fig, ax = plt.subplots() if None is add_to else add_to
-    plt.xlabel("n_train_samples")        
-    plt.ylabel(ylabel)
-    plt.title(_plt_title(title, metric_names, timestamps))
-    
-    for t in timestamps:
-        for m in metric_names:
-            t_info = get_info(t)
-            if m not in t_info["train_stats"]:
-                continue  # eg if trying to show copy loss on several
-                # timestamps but one is just pairs
-            d = t_info["train_stats"][m]
-            if len(d[0]) == 3:  # older version
-                n_train_samples, metric, stat_counter = list(zip(*d))
-            else:  # newer version
-                stat_syncer, n_train_samples, stat_counter, metric = \
-                    list(zip(*d))
-            _plot(n_train_samples, metric, plot_type=plot_type, 
-                max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
-                label=_line_label(t, m, timestamps, metric_names, ylabel))
+    ylabel_ax1 = _ylabel(metric_names_ax1)
+    ylabel_ax2 = _ylabel(metric_names_ax2)
+    fig, ax1 = plt.subplots() if None is add_to else add_to
 
-    ax.legend(markerscale=3)
+    ax1.set_xlabel("n_train_samples")        
+    ax1.set_ylabel(ylabel_ax1)
+
+    if metric_names_ax2:
+        ax2 = ax1.twinx()
+        ax2.set_ylabel(ylabel_ax2)
+        shared_ylabel = _longest_common_prefix([ylabel_ax1, ylabel_ax2])
+    else:
+        ax2 = None
+        shared_ylabel = ylabel_ax1
+
+    plt.title(_plt_title(title, 
+        metric_names_ax1 + metric_names_ax2, timestamps))
+
+    
+    color_i = 0
+    artists = []
+    for ax, metric_names, ylabel in [(ax1, metric_names_ax1, ylabel_ax1),
+                                     (ax2, metric_names_ax2, ylabel_ax2)]:
+        if not ax:
+            continue
+        for t in timestamps:
+            for m in metric_names:
+                t_info = get_info(t)
+                if m not in t_info["train_stats"]:
+                    continue  # eg if trying to show copy loss on several
+                    # timestamps but one is just pairs
+                d = t_info["train_stats"][m]
+                if len(d[0]) == 3:  # older version
+                    n_train_samples, metric, stat_counter = list(zip(*d))
+                else:  # newer version
+                    stat_syncer, n_train_samples, stat_counter, metric = \
+                        list(zip(*d))
+                extra_kwargs = {"color": colors[color_i]} if \
+                               None is not colors else None
+                color_i += 1
+                label = _line_label(t, m, timestamps,
+                    metric_names_ax1 + metric_names_ax2, 
+                    shared_ylabel)
+                artists.append(
+                    _plot(ax, n_train_samples, metric, plot_type=plot_type, 
+                    max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
+                    label= label, extra_kwargs=extra_kwargs))
+    
+    
+    ax1.legend(artists, [a.get_label() for a in artists], markerscale=3)
+
     fig = plt.gcf()
     fig.show()
     if None is not filename:
@@ -336,7 +373,8 @@ def plot_metrics(timestamps, metric_names, title=None, filename=None,
         fig.savefig(f"{fn}.png")
         with open(f"{fn}.txt", "w") as f:
             print(f"plot in {fn} made from timestamps:{timestamps}\n",
-                  f"and metrics:\n{metric_names}",file=f)
+                  f"and metrics:\n{metric_names_ax1 + metric_names_ax2}",
+                  file=f)
             print("timestamp full paths:\n",file=f)
             for t in timestamps:
                 print(t,"\t:",get_full_path(t),"\n",file=f)
