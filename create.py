@@ -8,7 +8,7 @@ from model.lm import LM
 from gpt2 import get_gpt2
 import dataclasses
 from train.lora import apply_lora_to_model
-from util import get_timestamp
+from util import get_probably_unique
 from os.path import join as path_join
 
 
@@ -48,7 +48,8 @@ def make_datamodule(data_params, model_params, verbose=True,
     if keep_datamodule:
         # stores in first (i.e., default) datamodules path
         dataset.save_to_folder(path_join(
-            datamodules_paths[0], data_params.dataset_name, get_timestamp()))
+            datamodules_paths[0], data_params.dataset_name,
+            get_probably_unique()))
 
     return dataset
 

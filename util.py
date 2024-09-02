@@ -14,6 +14,7 @@ import torch
 from datetime import datetime
 from functools import reduce
 import glob
+import math
 
 
 class GlobalTimingDepth:
@@ -76,10 +77,6 @@ def in_try(f):
                 "!!!!!!!!!!!!!\n\n\n")
             return e
     return tried_f
-
-
-def timestamp():
-    return datetime.now().strftime("%Y-%m-%d--%H-%M-%S")
 
 
 def pad(s, width=5):
@@ -148,6 +145,13 @@ def prepare_directory(path):
 
 def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d--%H-%M-%S")
+
+
+def get_probably_unique(n_digits=4):
+    n = random.randint(0, math.pow(10, n_digits) - 1)
+    return f"{get_timestamp()}---{n}"
+    # sometimes get jobs scheduled at exact same second,
+    # so timestamp not enough for identifiers
 
 
 def is_all_type(lst, t):

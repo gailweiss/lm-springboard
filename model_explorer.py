@@ -3,7 +3,7 @@ from save_load import load_model, load_model_info, final_chkpt, models_paths
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from util import prepare_directory, get_timestamp, glob_nosquares
+from util import prepare_directory, glob_nosquares
 import sys
 from os.path import join as path_join
 from util import printer_print as print
@@ -11,14 +11,18 @@ import json
 
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
-# "task_name" function in auto_timestamps makes this assumption, so be sure
+# "task_name" function in auto_identifiers makes this assumption, so be sure
 
-def auto_timestamps():
-    def is_timestamp(sample):
-        example = "2024-08-20--12-12-12"
-        if not len(sample) == len(example):
+def auto_identifiers():
+    def is_identifier(sample):
+        example_timestamp = "2024-08-20--12-12-12"
+        if sample.count("---") == 1:
+            ts, randstr = sample.split("---")
+        else:
+            ts = sample
+        if not len(ts) == len(example_timestamp):
             return False
-        for s,e in zip(sample, example):
+        for s,e in zip(ts, example_timestamp):
             if e == "-":
                 if not s == "-":
                     return False
@@ -38,13 +42,13 @@ def auto_timestamps():
     def last_folder(path):
         return path.split("/")[-1]
     
-    def last_is_timestamp(path):
-        return is_timestamp(last_folder(path))
+    def last_is_identifier(path):
+        return is_identifier(last_folder(path))
     
     all_paths = []
     for p in models_paths:
         all_paths += glob_nosquares(f"{p}/**", recursive=True)
-    all_paths = [p for p in all_paths if last_is_timestamp(p)]
+    all_paths = [p for p in all_paths if last_is_identifier(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
     all_tuples = [t for t in all_tuples if None is not t]
     res = {}
@@ -55,13 +59,13 @@ def auto_timestamps():
     return res
 
 
-def checkpoint_ids(timestamp):
+def checkpoint_ids(identifier):
     all_paths = []
     for p in models_paths:
         all_paths += glob_nosquares(f"{p}/**", recursive=True)
-    folder = next(p for p in all_paths if p.endswith(f"/{timestamp}"))
+    folder = next(p for p in all_paths if p.endswith(f"/{identifier}"))
     def is_checkpoint_folder(p):
-        bits = p.split(f"/{timestamp}/")
+        bits = p.split(f"/{identifier}/")
         if len(bits) != 2:
             return False
         return "/" not in bits[1]
@@ -80,20 +84,20 @@ def checkpoint_ids(timestamp):
 get_model_cache = {}
 
 
-def get_model_by_timestamp(timestamp, checkpoint=final_chkpt, verbose=True,
+def get_model_by_identifier(identifier, checkpoint=final_chkpt, verbose=True,
                            with_data=True, cache=False):
-    identifier = (timestamp, checkpoint, with_data)
+    cache_identifier = (identifier, checkpoint, with_data)
     if cache:
-        if identifier in get_model_cache:
-            return get_model_cache[identifier]
-        id2 = (timestamp, checkpoint, True)
+        if cache_identifier in get_model_cache:
+            return get_model_cache[cache_identifier]
+        id2 = (identifier, checkpoint, True)
         if id2 in get_model_cache:   # data already loaded, no harm
             return get_model_cache[id2]
 
-    p = get_full_path(timestamp, checkpoint=checkpoint)
+    p = get_full_path(identifier, checkpoint=checkpoint)
     if None is p:
         if verbose:
-            print("did not find path with timestamp:",timestamp)
+            print("did not find path with identifier:",identifier)
         return None
     if verbose:
         print("found model path:",p)
@@ -107,9 +111,9 @@ def get_model_by_timestamp(timestamp, checkpoint=final_chkpt, verbose=True,
             print("failed to load model from path")
 
     if cache:
-        if (timestamp, checkpoint, False) in get_model_cache:
-            del get_model_cache[(timestamp, checkpoint, False)]
-        get_model_cache[identifier] = res
+        if (identifier, checkpoint, False) in get_model_cache:
+            del get_model_cache[(identifier, checkpoint, False)]
+        get_model_cache[cache_identifier] = res
 
     return res
 
@@ -117,17 +121,17 @@ def get_model_by_timestamp(timestamp, checkpoint=final_chkpt, verbose=True,
 get_checkpoints_cache = {}
 
 
-def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
+def get_all_checkpoints_by_identifier(identifier, verbose=True, with_data=True,
                                      cache=False):
-    identifier = (timestamp, with_data)
+    cache_identifier = (identifier, with_data)
     if cache: 
-        if identifier in get_checkpoints_cache:
-            return get_checkpoints_cache[identifier]
-        id2 = (timestamp, True)
+        if cache_identifier in get_checkpoints_cache:
+            return get_checkpoints_cache[cache_identifier]
+        id2 = (identifier, True)
         if id2 in get_checkpoints_cache:  # no harm in extra info
             return get_checkpoints_cache[id2]
 
-    p_final = get_full_path(timestamp, checkpoint=final_chkpt)
+    p_final = get_full_path(identifier, checkpoint=final_chkpt)
     p_containing = p_final[:-len(f"/{final_chkpt}/")]
     paths = glob_nosquares(f"{p_containing}/*/")
     results = {"models":{}}
@@ -144,9 +148,9 @@ def get_all_checkpoints_by_timestamp(timestamp, verbose=True, with_data=True,
             results["params"] = res["params"]
 
     if cache:
-        if (timestamp, False) in get_checkpoints_cache:
-            del get_checkpoints_cache[(timestamp, False)]
-        get_checkpoints_cache[identifier] = results
+        if (identifier, False) in get_checkpoints_cache:
+            del get_checkpoints_cache[(identifier, False)]
+        get_checkpoints_cache[cache_identifier] = results
     return results
 
 
@@ -158,18 +162,18 @@ def clear_chkpts_cache():
 info_cache = {}
 
 
-def get_info(timestamp):  # always caches, info is small
-    if timestamp in info_cache:
-        return info_cache[timestamp]
-    path = get_full_path(timestamp, checkpoint=final_chkpt)
+def get_info(identifier):  # always caches, info is small
+    if identifier in info_cache:
+        return info_cache[identifier]
+    path = get_full_path(identifier, checkpoint=final_chkpt)
     res = load_model_info(path)
-    info_cache[timestamp] = res
+    info_cache[identifier] = res
     return res
 
 
-def verify_stable_load(timestamp, checkpoint=final_chkpt):
-    a1 = get_model_by_timestamp(timestamp, checkpoint)
-    a2 = get_model_by_timestamp(timestamp, checkpoint)
+def verify_stable_load(identifier, checkpoint=final_chkpt):
+    a1 = get_model_by_identifier(identifier, checkpoint)
+    a2 = get_model_by_identifier(identifier, checkpoint)
     m1 = a1["lm"]
     m2 = a2["lm"]
 
@@ -231,33 +235,33 @@ def _ylabel(metric_names):
     return res if res else "metric"
 
 
-def _plt_title(title, metric_names, timestamps):
+def _plt_title(title, metric_names, identifiers):
     if None is not title:
         return title
-    single_timestamp = len(timestamps) == 1
+    single_identifier = len(identifiers) == 1
     if len(metric_names) == 1:
         i = 0 if isinstance(metric_names, list) else metric_names.keys()[0]
         return metric_names[i]
-    if single_timestamp and isinstance(timestamps, list):
+    if single_identifier and isinstance(identifiers, list):
         return get_info(
-            timestamps[0])["params"]["data_params"].dataset_name
-    if single_timestamp and isinstance(timestamps, dict):
-        return timestamps[timestamps.keys()[0]]
-    # multi metrics, multi timestamps
+            identifiers[0])["params"]["data_params"].dataset_name
+    if single_identifier and isinstance(identifiers, dict):
+        return identifiers[identifiers.keys()[0]]
+    # multi metrics, multi identifiers
     all_ds_names = [get_info(t)["params"]["data_params"].dataset_name for \
-                    t in timestamps]
+                    t in identifiers]
     if len(set(all_ds_names)) == 1:
         return all_ds_names[0]
     raise Exception("given multiple tasks and multiple metrics",
                     "please provide title for plot")
 
 
-def _line_label(timestamp, metric, timestamps, metric_names, ylabel):
-    if isinstance(timestamps, dict):
-        # timestamps have been given with labels for plot
-        ts_label = timestamps[timestamp]
+def _line_label(identifier, metric, identifiers, metric_names, ylabel):
+    if isinstance(identifiers, dict):
+        # identifiers have been given with labels for plot
+        ts_label = identifiers[identifier]
     else:
-        t_info = get_info(timestamp)
+        t_info = get_info(identifier)
         ts_label = t_info["params"]["data_params"].dataset_name
     
     if len(metric_names) == 1:
@@ -270,7 +274,7 @@ def _line_label(timestamp, metric, timestamps, metric_names, ylabel):
     while metric_label.startswith("/") or metric_label.startswith("|"):
         metric_label = metric_label[1:]
     
-    if len(timestamps) == 1:
+    if len(identifiers) == 1:
         return metric_label
 
     return f"{ts_label}::{metric_label}"
@@ -293,15 +297,15 @@ def _plot(ax, x, y, s=0.5, label=None, plot_type="scatter",
         return ax.plot(x, y, label=label, **extra_kwargs)[0]
 
 
-def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
+def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  title=None, filename=None, colors=None,
                  add_to=None, plot_type="scatter", 
                  max_x=None, min_x=None, max_y=None, min_y=None):
-    # timestamps can be a dict giving the timestamps special names for 
-    # the plot labels, or just an iterable with the timestamps of interest
+    # identifiers can be a dict giving the identifiers special names for 
+    # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name)
-    if isinstance(timestamps, str):
-        timestamps = [timestamps]
+    if isinstance(identifiers, str):
+        identifiers = [identifiers]
     if isinstance(metric_names_ax1, str):
         metric_names_ax1 = [metric_names_ax1]
     if isinstance(metric_names_ax2, str):
@@ -310,7 +314,7 @@ def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
         metric_names_ax2 = []
         
     print("printing plots from models from folders:")
-    for t in timestamps:
+    for t in identifiers:
         print(t, get_full_path(t))
 
     ylabel_ax1 = _ylabel(metric_names_ax1)
@@ -329,7 +333,7 @@ def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
         shared_ylabel = ylabel_ax1
 
     plt.title(_plt_title(title, 
-        metric_names_ax1 + metric_names_ax2, timestamps))
+        metric_names_ax1 + metric_names_ax2, identifiers))
 
     
     color_i = 0
@@ -338,12 +342,12 @@ def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
                                      (ax2, metric_names_ax2, ylabel_ax2)]:
         if not ax:
             continue
-        for t in timestamps:
+        for t in identifiers:
             for m in metric_names:
                 t_info = get_info(t)
                 if m not in t_info["train_stats"]:
                     continue  # eg if trying to show copy loss on several
-                    # timestamps but one is just pairs
+                    # identifiers but one is just pairs
                 d = t_info["train_stats"][m]
                 if len(d[0]) == 3:  # older version
                     n_train_samples, metric, stat_counter = list(zip(*d))
@@ -353,7 +357,7 @@ def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
                 extra_kwargs = {"color": colors[color_i]} if \
                                None is not colors else None
                 color_i += 1
-                label = _line_label(t, m, timestamps,
+                label = _line_label(t, m, identifiers,
                     metric_names_ax1 + metric_names_ax2, 
                     shared_ylabel)
                 artists.append(
@@ -372,11 +376,11 @@ def plot_metrics(timestamps, metric_names_ax1, metric_names_ax2=None,
         prepare_directory(directory)
         fig.savefig(f"{fn}.png")
         with open(f"{fn}.txt", "w") as f:
-            print(f"plot in {fn} made from timestamps:{timestamps}\n",
+            print(f"plot in {fn} made from identifiers:{identifiers}\n",
                   f"and metrics:\n{metric_names_ax1 + metric_names_ax2}",
                   file=f)
-            print("timestamp full paths:\n",file=f)
-            for t in timestamps:
+            print("identifier full paths:\n",file=f)
+            for t in identifiers:
                 print(t,"\t:",get_full_path(t),"\n",file=f)
     return fig, ax
 
@@ -406,10 +410,10 @@ def check_validation(loaded_model):
     return recorded_val_loss - curr_val_loss
 
 
-def show_lm_attns(timestamp, x, layers=None, heads=None, store=False, 
+def show_lm_attns(identifier, x, layers=None, heads=None, store=False, 
                   checkpoint=final_chkpt, cache=True):
     
-    chkpt = get_model_by_timestamp(timestamp, checkpoint=checkpoint,
+    chkpt = get_model_by_identifier(identifier, checkpoint=checkpoint,
         verbose=False, with_data=False, cache=cache)
     task_name = chkpt["params"]["data_params"].dataset_name
     lm = chkpt["lm"]
@@ -423,7 +427,7 @@ def show_lm_attns(timestamp, x, layers=None, heads=None, store=False,
     # batch size should be 1
 
     if store:
-        folder_name = f"../attentions/{task_name}/{timestamp}/" +\
+        folder_name = f"../attentions/{task_name}/{identifier}/" +\
                       f"heads-at-chkpt/{checkpoint}"
         prepare_directory(folder_name)
 
@@ -458,8 +462,8 @@ def show_lm_attns(timestamp, x, layers=None, heads=None, store=False,
     return z, attns, fig  # last fig, but good enough when only requesting one
 
 
-def show_head_progress(timestamp, x, l, h, cache=True, store=False):
-    res = get_all_checkpoints_by_timestamp(timestamp,
+def show_head_progress(identifier, x, l, h, cache=True, store=False):
+    res = get_all_checkpoints_by_identifier(identifier,
         verbose=False, cache=cache, with_data=False)
     
     task_name = res["params"]["data_params"].dataset_name
@@ -467,7 +471,7 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
         list(res["models"][final_chkpt]["lm"].tokenizer.get_vocab().keys())
 
     if store:
-        folder_name = f"../attentions/{task_name}/{timestamp}/" +\
+        folder_name = f"../attentions/{task_name}/{identifier}/" +\
                       f"heads-over-time/L[{l}]-H[{h}]"
         prepare_directory(folder_name)
 
@@ -485,24 +489,24 @@ def show_head_progress(timestamp, x, l, h, cache=True, store=False):
                           n, d in res["models"].items()}
 
     for nsamples in sorted(list(models_by_nsamples.keys())):
-        _, _, fig = show_lm_attns(timestamp, x, layers=[l], heads=[h],
+        _, _, fig = show_lm_attns(identifier, x, layers=[l], heads=[h],
                                   checkpoint=str(nsamples), cache=cache)
         if store:
             fig.savefig(f"{folder_name}/{nsamples}")
 
-def get_full_path(timestamp, checkpoint=final_chkpt):
+def get_full_path(identifier, checkpoint=final_chkpt):
     paths = []
     for p in models_paths:
         paths += glob_nosquares(f"{p}/**/", recursive=True)
-    paths = [p for p in paths if (f"/{timestamp}/" in p and \
+    paths = [p for p in paths if (f"/{identifier}/" in p and \
                                   p.endswith(f"/{checkpoint}/"))]
     if len(paths) == 1:
         return paths[0]
     if len(paths) < 1:
-        print("could not find model folder with:", timestamp, checkpoint)
+        print("could not find model folder with:", identifier, checkpoint)
         return None
     if len(paths) > 1:
-        print("found multiple model folders with:", timestamp, checkpoint)
+        print("found multiple model folders with:", identifier, checkpoint)
         print(paths)
         return None
 
@@ -528,10 +532,10 @@ def just_last_stats(model_stats):
     return {n: single_stat(s) for n, s in model_stats.items()}
 
 
-def same_characteristics(timestamps, mp=True, tp=True, dp=True, ignorable=None):
-    if not timestamps:
+def same_characteristics(identifiers, mp=True, tp=True, dp=True, ignorable=None):
+    if not identifiers:
         return True
-    infos = [(t, load_model_info(get_full_path(t))) for t in timestamps]
+    infos = [(t, load_model_info(get_full_path(t))) for t in identifiers]
     to_check = (["model_params"] if mp else []) + \
                (["train_params"] if tp else []) + \
                (["data_params"] if dp else [])

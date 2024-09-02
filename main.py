@@ -9,7 +9,7 @@ import lightning as pl
 import argparse
 from dataclasses import asdict
 import wandb
-from util import get_timestamp, print_nicely_nested, in_try, \
+from util import get_probably_unique, print_nicely_nested, in_try, \
                  prepare_directory, printer, glob_nosquares
 from util import printer_print as print
 from save_load import save_model as save_model_
@@ -62,7 +62,7 @@ class Namer:
 
     def set_config(self, dp, tp, mp):
         self.dp, self.tp, self.mp = dp, tp, mp
-        self.timestamp = get_timestamp()
+        self.identifier = get_probably_unique()
 
     def wandb_proj_name(self):
         specific = self.args.config if None is self.args.wandb_proj_name \
@@ -78,7 +78,7 @@ class Namer:
         # given run name might have come from wandb so need to receive it
         wn = "" if None is given_run_name else f"{given_run_name}/"
         return f"{self.args.config}/{self.dp.dataset_name}/" +\
-               f"{wn}{self.timestamp}"
+               f"{wn}{self.identifier}"
 
 
 def build_full(dp, tp, mp):

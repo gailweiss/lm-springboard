@@ -83,8 +83,9 @@ class ModelParams:
 #   max_seq_len, all arguments describing the model architecture are
 #   overwritten to describe the saved model (for max_seq_len, get minimum
 #   between given max_seq_len and model max_seq_len). Supersedes from_saved.
-#   Describes saved_model as timestamp for get_model_by_timestamp in
-#   model_explorer, e.g. from_saved = "2024-01-01--00-00-00".
+#   Describes saved_model as identifier for identifier in
+#   model_explorer, 
+#   e.g. from_saved = "2024-01-01--00-00-00" or "2024-01-01--00-00-00---1234".
 # individual_head_params:
 #   Implementation setting: how to store the parameters of each head in each
 #   transformer layer. Options:

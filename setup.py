@@ -29,8 +29,8 @@ def setup_model_and_data(data_params, model_params, train_params, verbose=True,
     load_res = {}
     if loading:
         if model_params.from_saved:
-            p = get_full_path(timestamp, checkpoint=checkpoint)
-            assert None is not p, f"didn't find path for timestamp {timestamp}"
+            p = get_full_path(identifier, checkpoint=checkpoint)
+            assert None is not p, f"didn't find path for identifier {identifier}"
             load_res = load_model(p, full=True, verbose=verbose, 
                                   with_data=not skip_data)
             dataset = load_res["dataset"]

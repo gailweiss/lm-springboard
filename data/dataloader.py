@@ -158,8 +158,8 @@ def get_existing_datamodule(data_params, model_params):
     for p in datamodules_paths:
         print("checking inside path:", p)
         print("path contains:", glob_nosquares(f"{p}/*"))
-        with_timestamps = glob_nosquares(f"{p}/{data_params.dataset_name}/*")
-        for path in with_timestamps:
+        with_identifiers = glob_nosquares(f"{p}/{data_params.dataset_name}/*")
+        for path in with_identifiers:
             print("checking path:", path)
             with open(path_join(path, "model_params.json"), "r") as f:
                 mpd = json.load(f)
