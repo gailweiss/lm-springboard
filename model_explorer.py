@@ -51,11 +51,15 @@ def auto_identifiers():
     all_paths = [p for p in all_paths if last_is_identifier(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
     all_tuples = [t for t in all_tuples if None is not t]
+    print(all_tuples[:3])
     res = {}
     for tn, ts, p in all_tuples:
         if tn not in res:
             res[tn] = []
         res[tn].append((ts, p))
+
+    for tn in res:
+        res[tn] = sorted(res[tn], key=lambda x:x[0])
     return res
 
 
@@ -507,7 +511,7 @@ def get_full_path(identifier, checkpoint=final_chkpt):
         return None
     if len(paths) > 1:
         print("found multiple model folders with:", identifier, checkpoint)
-        print(paths)
+        print("\n", "\n".join(paths))
         return None
 
 
@@ -548,7 +552,7 @@ def same_characteristics(identifiers, mp=True, tp=True, dp=True, ignorable=None)
             for t, p in tparams[1:]:
                 p = vars(p)
                 if p[k] != v:
-                    print(f"mismatch between {get_full_path(t0)} and",
-                          f"{get_full_path(t)} on value {k}: {v} vs {p[k]}")
+                    print(f"mismatch between:\n{get_full_path(t0)} and",
+                          f"\n{get_full_path(t)}\n on value {k}: {v} vs {p[k]}")
                     return False
     return True
