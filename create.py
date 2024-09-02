@@ -1,9 +1,6 @@
-from data.dataloader import get_data, LMDataModule, DataParams, \
-                            datamodules_paths
+from data.dataloader import get_data, LMDataModule, datamodules_paths
 from model.tokenizer import MyTokenizer
 from model.transformer.transformer import Transformer
-from model.model_params import ModelParams
-from train.train_params import TrainParams
 from model.lm import LM
 from gpt2 import get_gpt2
 import dataclasses

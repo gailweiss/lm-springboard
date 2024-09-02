@@ -2,9 +2,9 @@ from model.transformer.transformer import Transformer
 from create import make_model
 from save_load import load_model, get_datamodule
 from model_explorer import get_full_path
-from data.dataloader import DataParams
-from model.model_params import ModelParams
-from train.train_params import TrainParams
+from data.dataloader import dp_from_dict
+from model.model_params import mp_from_dict
+from train.train_params import tp_from_dict
 from util import printer_print as print
 
 
@@ -57,7 +57,7 @@ def setup_model_and_data(data_params, model_params, train_params, verbose=True,
 
 
 def quick_data_grab(dataset_name, tokenizer_source_name="gpt2", verbose=False):
-    dp = DataParams(dataset_name=dataset_name, debug_crop=500)
-    mp = ModelParams(tokenizer_source_name=tokenizer_source_name)
-    tp = TrainParams()
+    dp = dp_from_dict(dataset_name=dataset_name, debug_crop=500)
+    mp = mp_from_dict(tokenizer_source_name=tokenizer_source_name)
+    tp = tp_from_dict()
     return get_datamodule(dp, mp, verbose=verbose, keep_datamodule=False)

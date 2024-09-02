@@ -25,6 +25,18 @@ class TrainParams:
     checkpoint_every: int = 0
     early_stop_nsamples: int = -1
 
+
+def tp_from_dict(forgiving=False, **d):
+    example = TrainParams()
+    if forgiving:
+        d = {n: v for n, v in d.items() if n in example}
+    if next((True for n in d if n not in vars(example)), False):
+        # want to set unexpected property
+        return None
+    return TrainParams(**d)
+    # ready for fixes over time
+
+
 # batch_size:
 #   The batch size used for the training and validation sets
 # accumulate_grad_batches:

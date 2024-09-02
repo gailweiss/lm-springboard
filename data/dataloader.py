@@ -7,7 +7,7 @@ import datasets
 from data.syntheticdata import syntheticdatasets
 from os.path import join as path_join
 from model.tokenizer import load_stored_tokenizer_if_exists
-from model.model_params import ModelParams
+from model.model_params import mp_from_dict
 import numpy as np
 from util import prepare_directory, glob_nosquares
 import json
@@ -45,6 +45,17 @@ class DataParams:
     is_synthetic_task: bool = False  # for internal use
     lines_per_sample: int = 1
     max_seq_len: int = -1
+
+
+def dp_from_dict(forgiving=False, **d):
+    example = DataParams()
+    if forgiving:
+        d = {n: v for n, v in d.items() if n in example}
+    if next((True for n in d if n not in vars(example)), False):
+        # want to set unexpected property
+        return None
+    return DataParams(**d)
+    # ready for fixes over time
 
 
 # dataset_name:
@@ -214,7 +225,7 @@ class LMDataModule(pl.LightningDataModule):
 
     def setup_from_folder(self, path):  
         with open(path_join(path, "model_params.json"), "r") as f:
-            self.model_params = ModelParams()
+            self.model_params = mp_from_dict()
             mp = json.load(f)
             [setattr(self.model_params, a, mp[a]) for a in mp]
             # allows that mp may specify some additional things not in current
@@ -222,7 +233,7 @@ class LMDataModule(pl.LightningDataModule):
             # these additional things only add information, but do not take
             # away or modify anything needed here
         with open(path_join(path, "data_params.json"), "r") as f:
-            self.data_params = DataParams()
+            self.data_params = dp_from_dict()
             dp = json.load(f)
             [setattr(self.data_params, a, dp[a]) for a in dp]
             # as with model_params above

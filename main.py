@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-from data.dataloader import DataParams
-from model.model_params import ModelParams
+from data.dataloader import dp_from_dict
+from model.model_params import mp_from_dict
 from model.lm import LM
 from train.trainer import Trainer
-from train.train_params import TrainParams
+from train.train_params import tp_from_dict
 import lightning as pl
 import argparse
 from dataclasses import asdict
@@ -111,9 +111,9 @@ def read_config(config_filename):
 
 
 def get_params(config_filename):
-    dp = DataParams()
-    tp = TrainParams()
-    mp = ModelParams()
+    dp = dp_from_dict()
+    tp = tp_from_dict()
+    mp = mp_from_dict()
     overwrites = read_config(config_filename)
     for params, news, name in [(dp, overwrites["DataParams"], "dp"),
                                (tp, overwrites["TrainParams"], "tp"),

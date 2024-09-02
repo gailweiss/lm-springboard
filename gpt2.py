@@ -1,5 +1,5 @@
 from model.tokenizer import MyTokenizer
-from model.model_params import ModelParams
+from model.model_params import mp_from_dict
 from transformers import AutoModelForCausalLM
 from model.lm import LM
 
@@ -8,7 +8,7 @@ def get_gpt2():
     # sometimes i just want to look around it,
     # nothing to do with all the training stuff i have -
     # just some gpt2 poking. nice to have this in the base repository too
-    model_params = ModelParams()
+    model_params = mp_from_dict()
     gpt2 = AutoModelForCausalLM.from_pretrained("gpt2")
 
     # my code uses these

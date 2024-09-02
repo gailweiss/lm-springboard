@@ -4,10 +4,10 @@ from pathlib import Path
 from os.path import join as path_join
 from create import make_model, make_datamodule
 from train.trainer import Trainer
-from train.train_params import TrainParams
-from model.model_params import ModelParams
+from train.train_params import tp_from_dict
+from model.model_params import mp_from_dict
 from model.tokenizer import load_stored_tokenizer_if_exists
-from data.dataloader import DataParams, get_existing_datamodule
+from data.dataloader import dp_from_dict, get_existing_datamodule
 import glob
 from util import printer_print as print
 
@@ -47,11 +47,11 @@ def load_model_info(folder_name):
 
     res = {"params": {}}
     with open(path_join(folder_name, "model_params.json"), "r") as f:
-        res["params"]["model_params"] = ModelParams(**json.load(f))
+        res["params"]["model_params"] = mp_from_dict(**json.load(f))
     with open(path_join(folder_name, "data_params.json"), "r") as f:
-        res["params"]["data_params"] = DataParams(**json.load(f))
+        res["params"]["data_params"] = dp_from_dict(**json.load(f))
     with open(path_join(folder_name, "train_params.json"), "r") as f:
-        res["params"]["train_params"] = TrainParams(**json.load(f))
+        res["params"]["train_params"] = tp_from_dict(**json.load(f))
 
     with open(path_join(folder_name, "train_stats.json"), "r") as f:
         res["train_stats"] = json.load(f)

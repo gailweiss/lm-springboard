@@ -16,6 +16,16 @@ class ModelParams:
     individual_head_params: bool = False
     pos_encoding: str = "learned"
 
+def mp_from_dict(forgiving=False, **d):
+    example = ModelParams()
+    if forgiving:
+        d = {n: v for n, v in d.items() if n in example}
+    if next((True for n in d if n not in vars(example)), False):
+        # want to set unexpected property
+        return None
+    return ModelParams(**d)
+    # ready for fixes over time
+
 # the base code only provides vanilla transformer models, this is how these
 # parameters apply to them. You can reuse them also for other purposes - e.g.
 # n_layers will also be useful if specifying an RNN.
