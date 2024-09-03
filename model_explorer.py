@@ -538,7 +538,9 @@ def just_last_stats(model_stats):
 def same_characteristics(identifiers, mp=True, tp=True, dp=True, ignorable=None):
     if not identifiers:
         return True
-    infos = [(t, load_model_info(get_full_path(t))) for t in identifiers]
+    if None is not ignorable:
+        ignorable = set(ignorable)  # in case it gets long and annoying
+    infos = [(t, get_info(t)) for t in identifiers]
     to_check = (["model_params"] if mp else []) + \
                (["train_params"] if tp else []) + \
                (["data_params"] if dp else [])
