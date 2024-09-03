@@ -316,10 +316,6 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
     if None is metric_names_ax2:
         metric_names_ax2 = []
         
-    print("printing plots from models from folders:")
-    for t in identifiers:
-        print(t, get_full_path(t))
-
     ylabel_ax1 = _ylabel(metric_names_ax1)
     ylabel_ax2 = _ylabel(metric_names_ax2)
     fig, ax1 = plt.subplots() if None is add_to else add_to
