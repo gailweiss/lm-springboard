@@ -259,7 +259,8 @@ def _plt_title(title, metric_names, identifiers):
                     "please provide title for plot")
 
 
-def _line_label(identifier, metric, identifiers, metric_names, ylabel):
+def _line_label(identifier, metric, identifiers, all_metric_names, 
+                ylabel, maybe_metric_nicknames):
     if isinstance(identifiers, dict):
         # identifiers have been given with labels for plot
         ts_label = identifiers[identifier]
@@ -267,16 +268,18 @@ def _line_label(identifier, metric, identifiers, metric_names, ylabel):
         t_info = get_info(identifier)
         ts_label = t_info["params"]["data_params"].dataset_name
     
-    if len(metric_names) == 1:
+    if len(all_metric_names) == 1:
         return ts_label
 
-    metric_label = metric_names[metric] if \
-        isinstance(metric_names, dict) else metric 
-    if metric_label.startswith(ylabel):
-        metric_label = metric_label[len(ylabel):]
-    while metric_label.startswith("/") or metric_label.startswith("|"):
-        metric_label = metric_label[1:]
-    
+    if isinstance(maybe_metric_nicknames, dict):
+        metric_label = maybe_metric_nicknames[metric]
+    else:
+        metric_label = metric 
+        if metric_label.startswith(ylabel):
+            metric_label = metric_label[len(ylabel):]
+        while metric_label.startswith("/") or metric_label.startswith("|"):
+            metric_label = metric_label[1:]
+        
     if len(identifiers) == 1:
         return metric_label
 
@@ -331,8 +334,12 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         ax2 = None
         shared_ylabel = ylabel_ax1
 
-    plt.title(_plt_title(title, 
-        metric_names_ax1 + metric_names_ax2, identifiers))
+    def names_as_list(names_or_dict):
+        return names_or_dict if isinstance(names_or_dict, list) else \
+            list(names_or_dict.keys())
+    all_metric_names = names_as_list(metric_names_ax1) + \
+                       names_as_list(metric_names_ax2)
+    plt.title(_plt_title(title, all_metric_names, identifiers))
 
     
     color_i = 0
@@ -356,9 +363,8 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                 extra_kwargs = {"color": colors[color_i]} if \
                                None is not colors else None
                 color_i += 1
-                label = _line_label(t, m, identifiers,
-                    metric_names_ax1 + metric_names_ax2, 
-                    shared_ylabel)
+                label = _line_label(t, m, identifiers, all_metric_names, 
+                                    shared_ylabel, metric_names)
                 artists.append(
                     _plot(ax, n_train_samples, metric, plot_type=plot_type, 
                     max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
@@ -376,7 +382,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         fig.savefig(f"{fn}.png")
         with open(f"{fn}.txt", "w") as f:
             print(f"plot in {fn} made from identifiers:{identifiers}\n",
-                  f"and metrics:\n{metric_names_ax1 + metric_names_ax2}",
+                  f"and metrics:\n{all_metric_names}",
                   file=f)
             print("identifier full paths:\n",file=f)
             for t in identifiers:
