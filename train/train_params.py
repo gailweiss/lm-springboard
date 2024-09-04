@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from util import apply_dataclass
 
 
 @dataclass
@@ -27,13 +28,7 @@ class TrainParams:
 
 
 def tp_from_dict(forgiving=False, **d):
-    example = TrainParams()
-    if forgiving:
-        d = {n: v for n, v in d.items() if n in example}
-    if next((True for n in d if n not in vars(example)), False):
-        # want to set unexpected property
-        return None
-    return TrainParams(**d)
+    return apply_dataclass(TrainParams, d, forgiving=forgiving)
     # ready for fixes over time
 
 

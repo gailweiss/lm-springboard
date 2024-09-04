@@ -233,3 +233,26 @@ def glob_nosquares(p, **kw):
     p = p.replace("[","§[§").replace("]","§]§")
     p = p.replace("§[§","[[]").replace("§]§","[]]")
     return glob.glob(p, **kw)
+
+
+def apply_dataclass(dataclass, given_attrs, forgiving=False, 
+                    convert_lists_to_tuples=True, name_changes=None):
+    allowed = list(vars(dataclass()).keys())
+    if forgiving:
+        given_attrs = {n: v for n, v in given_attrs.items() if n in allowed}
+    if convert_lists_to_tuples:
+        given_attrs = {n: tuple(v) if isinstance(v, list) else v for \
+                       n, v in given_attrs.items()}
+    if name_changes:
+        for old_name, new_name in name_changes:
+            if old_name in given_attrs:
+                assert new_name not in given_attrs
+                given_attrs[new_name] = given_attrs[old_name]
+                del given_attrs[old_name]
+    if next((True for n in given_attrs if n not in allowed), False):
+        # trying to set unexpected property
+        print("unexpected property:", 
+              next(n for n in given_attrs if n not in allowed),
+              "-- not loading params")
+        return None
+    return dataclass(**given_attrs)

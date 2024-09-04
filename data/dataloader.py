@@ -9,7 +9,7 @@ from os.path import join as path_join
 from model.tokenizer import load_stored_tokenizer_if_exists
 from model.model_params import mp_from_dict
 import numpy as np
-from util import prepare_directory, glob_nosquares
+from util import prepare_directory, glob_nosquares, apply_dataclass
 import json
 from util import printer_print as print
 
@@ -48,13 +48,7 @@ class DataParams:
 
 
 def dp_from_dict(forgiving=False, **d):
-    example = DataParams()
-    if forgiving:
-        d = {n: v for n, v in d.items() if n in example}
-    if next((True for n in d if n not in vars(example)), False):
-        # want to set unexpected property
-        return None
-    return DataParams(**d)
+    return apply_dataclass(DataParams, d, forgiving=forgiving)
     # ready for fixes over time
 
 
