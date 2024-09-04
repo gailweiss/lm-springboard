@@ -3,33 +3,49 @@ from save_load import load_model, load_model_info, final_chkpt, models_paths
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from util import prepare_directory, glob_nosquares
+from util import prepare_directory, glob_nosquares, pad
 import sys
 from os.path import join as path_join
 from util import printer_print as print
 import json
+import itertools
+from copy import deepcopy
 
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
 # "task_name" function in auto_identifiers makes this assumption, so be sure
 
-def auto_identifiers():
-    def is_identifier(sample):
-        example_timestamp = "2024-08-20--12-12-12"
-        if sample.count("---") == 1:
-            ts, randstr = sample.split("---")
-        else:
-            ts = sample
-        if not len(ts) == len(example_timestamp):
-            return False
-        for s,e in zip(ts, example_timestamp):
-            if e == "-":
-                if not s == "-":
-                    return False
-            elif not s in "0123456789":
+
+def identifier2timestamp(identifier):
+    if identifier.count("---") == 1:
+        return identifier.split("---")[0]
+    if identifier.count("---") == 0:
+        return identifier
+    return -1
+
+
+def is_timestamp(seq):
+    if not isinstance(seq, str):
+        return False
+    example_timestamp = "2024-08-20--12-12-12"
+    if not len(seq) == len(example_timestamp):
+        return False
+    for s,e in zip(seq, example_timestamp):
+        if e == "-":
+            if not s == "-":
                 return False
-        return True
-    
+        elif not s in "0123456789":
+            return False
+    return True
+
+
+def is_identifier(seq):
+        if not isinstance(seq, str):
+            return False
+        return is_timestamp(identifier2timestamp(seq))
+        
+
+def auto_identifiers():
     def task_name(path):
         try:
             with open(path_join(path,final_chkpt,"data_params.json"), "r") as f:
@@ -50,16 +66,124 @@ def auto_identifiers():
         all_paths += glob_nosquares(f"{p}/**", recursive=True)
     all_paths = [p for p in all_paths if last_is_identifier(p)]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
-    all_tuples = [t for t in all_tuples if None is not t]
     res = {}
-    for tn, ts, p in all_tuples:
+    for tn, identifier, p in all_tuples:
         if tn not in res:
             res[tn] = []
-        res[tn].append((ts, p))
+        res[tn].append((identifier, p))
 
     for tn in res:
         res[tn] = sorted(res[tn], key=lambda x:x[0])
     return res
+
+
+def date_in_range(i, min_date, max_date):
+    ts = identifier2timestamp(i)
+    if not is_timestamp(ts):
+        print("got bad identifier:",i,". not using")
+        return False
+    if None is not max_date:
+        if not is_timestamp(max_date):
+            print("bad max date request:", max_date)
+            return False
+        if ts > max_date:
+            return False
+    if None is not min_date:
+        if not is_timestamp(min_date):
+            print("bad min date request:", min_date)
+            return False
+        if ts < min_date:
+            return False
+    return True
+
+
+def all_identifiers_with_configs(kws, min_date=None, max_date=None):
+    # kws: nested dict of configs. 
+    # level one: data_params, train_params, model_params
+    # level two: each config that is being specified in this request, 
+    # e.g. n_layers
+    # values at level 2 can be either a single value (e.g. 4) or a
+    # list (specifically a list, not a tuple) of acceptable ones.
+    # note this ties into constraints on parameters in other places - 
+    # lists in the config files are treated as lists of values to run
+    # rather than a single value (that is a list) for that parameter
+    identifiers_dict = auto_identifiers()
+    dataset_names = kws.get("data_params", {}).get("dataset_name", [])
+    if not isinstance(dataset_names, list):
+        dataset_names = [dataset_names]
+    if not dataset_names:
+        dataset_names = list(identifiers_dict.keys())
+    res = itertools.chain.from_iterable(
+        [identifiers_dict[dn] for dn in dataset_names])        
+
+    res = [i for i, path in res if date_in_range(i, min_date, max_date)]
+    for paramset_name in kws:
+        for param_name in kws[paramset_name]:
+            target_vals = kws[paramset_name][param_name]
+            if not isinstance(target_vals, list):  # not multiple options
+                target_vals = [target_vals]  # treat as multiple options
+            res = [i for i in res if \
+                vars(get_info(i)["params"][paramset_name]).get(param_name, []) \
+                in target_vals]
+                # [] is not a valid param value, for reasons outlined above
+    return res
+
+
+def compare_configs(identifiers, print_padding=30):
+    ids_with_missing_paramsets = \
+        set([i for i in identifiers if None in get_info(i).values()])
+    if ids_with_missing_paramsets:
+        print("following ids have a missing paramset:")
+        for i in sorted(list(ids_with_missing_paramsets)):
+            missing_sets = [psn for psn in get_info(i) if \
+                            None is get_info(i)[psn]]
+            print(f"\n{i}, missing: {missing_sets}. path: {get_full_path(i)}")
+        print("==\n\n")
+    
+    def params_dicts(model_info):
+        return {k: vars(v) for k, v in model_info["params"].items()}
+    infos = [(i, params_dicts(get_info(i))) for i in identifiers if i not in \
+             ids_with_missing_paramsets]
+
+
+    # check all infos have same structure before reaching weird conclusions
+    example_id, example_info = infos[0]
+    for i, info in infos:
+        if set(example_info.keys()) != set(info.keys()):
+            print("in ids:",example_id,"vs",i,",")
+            print("have different structures, cant proceed:",
+                  example_info.keys(),"vs",info.keys())
+            return -1
+        for k in example_info:
+            if set(example_info[k].keys()) != set(info[k].keys()):
+                print("in ids:",example_id,"vs",i,",")
+                print(f"have different structures in {k}, cant proceed:",
+                      example_info[k].keys(),"vs",info[k].keys())
+                return -1
+
+    all_vals = deepcopy(example_info)
+    for k1 in all_vals:
+        for k2 in all_vals[k1]:
+            all_vals[k1][k2] = set([all_vals[k1][k2]])
+            for i, info in infos[1:]:
+                all_vals[k1][k2].add(info[k1][k2])
+
+    padline = "="*40 + "\n"
+    print(f"{padline}\tconstant values:\n{padline}")
+    for k1 in all_vals:
+        print(f"\n === {k1}: ===\n")
+        for k2 in all_vals[k1]:
+            if len(all_vals[k1][k2]) == 1:
+                print(f"{pad(k2, print_padding, 'left')}:\t",
+                    list(all_vals[k1][k2])[0])
+
+    print(f"\n\n{padline}\tvaried values:\n{padline}")
+    for k1 in all_vals:
+        print(f"\n=== {k1}: ===\n")
+        for k2 in all_vals[k1]:
+            if len(all_vals[k1][k2]) > 1:
+                print(f"{pad(k2, print_padding, 'left')}:\t",
+                    list(all_vals[k1][k2]))
 
 
 def checkpoint_ids(identifier):
@@ -165,13 +289,14 @@ def clear_chkpts_cache():
 info_cache = {}
 
 
-def get_info(identifier):  # always caches, info is small
-    if identifier in info_cache:
-        return info_cache[identifier]
-    path = get_full_path(identifier, checkpoint=final_chkpt)
-    res = load_model_info(path)
-    info_cache[identifier] = res
-    return res
+def get_info(identifier, with_train_stats=False):
+    # always caches, info is generally small
+    cache_id = (identifier, with_train_stats)
+    if cache_id not in info_cache:        
+        path = get_full_path(identifier, checkpoint=final_chkpt)
+        res = load_model_info(path, with_train_stats=with_train_stats)
+        info_cache[cache_id] = res
+    return info_cache[cache_id]
 
 
 def verify_stable_load(identifier, checkpoint=final_chkpt):
@@ -350,7 +475,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
             continue
         for t in identifiers:
             for m in metric_names:
-                t_info = get_info(t)
+                t_info = get_info(t, with_train_stats=True)
                 if m not in t_info["train_stats"]:
                     continue  # eg if trying to show copy loss on several
                     # identifiers but one is just pairs

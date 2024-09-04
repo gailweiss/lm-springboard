@@ -79,11 +79,16 @@ def in_try(f):
     return tried_f
 
 
-def pad(s, width=5):
-    total = width - len(str(s))
+def pad(s, width=5, place="center"):
+    s = str(s)
+    total = width - len(s)    
+    if place == "left":
+        return s + (" " * total)
+    if place == "right":
+        return (" " * total) + s
     lohalf = int(np.floor(total / 2))
     hihalf = total - lohalf
-    return " " * lohalf + str(s) + " " * hihalf
+    return (" " * lohalf) + s + (" " * hihalf)
 
 
 def binsearch(val, lst):
