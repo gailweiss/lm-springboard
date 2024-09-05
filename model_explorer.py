@@ -430,7 +430,7 @@ def _plot(ax, x, y, s=0.5, label=None, plot_type="scatter",
 
 def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  title=None, filename=None, colors=None,
-                 add_to=None, plot_type="scatter", 
+                 add_to=None, plot_type="scatter", stylist=None,
                  max_x=None, min_x=None, max_y=None, min_y=None):
     # identifiers can be a dict giving the identifiers special names for 
     # the plot labels, or just an iterable with the identifiers of interest
@@ -443,6 +443,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         metric_names_ax2 = [metric_names_ax2]
     if None is metric_names_ax2:
         metric_names_ax2 = []
+    assert [stylist, colors].count(None) >= 1
         
     ylabel_ax1 = _ylabel(metric_names_ax1)
     ylabel_ax2 = _ylabel(metric_names_ax2)
@@ -473,9 +474,9 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                                      (ax2, metric_names_ax2, ylabel_ax2)]:
         if not ax:
             continue
-        for t in identifiers:
+        for i in identifiers:
             for m in metric_names:
-                t_info = get_info(t, with_train_stats=True)
+                t_info = get_info(i, with_train_stats=True)
                 if m not in t_info["train_stats"]:
                     continue  # eg if trying to show copy loss on several
                     # identifiers but one is just pairs
@@ -487,8 +488,10 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                         list(zip(*d))
                 extra_kwargs = {"color": colors[color_i]} if \
                                None is not colors else None
+                extra_kwargs = stylist(i, m) if None is not stylist else \
+                               extra_kwargs
                 color_i += 1
-                label = _line_label(t, m, identifiers, all_metric_names, 
+                label = _line_label(i, m, identifiers, all_metric_names, 
                                     shared_ylabel, metric_names)
                 artists.append(
                     _plot(ax, n_train_samples, metric, plot_type=plot_type, 
