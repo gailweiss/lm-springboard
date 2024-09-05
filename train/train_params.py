@@ -27,7 +27,7 @@ class TrainParams:
     early_stop_nsamples: int = -1
 
 
-def tp_from_dict(forgiving=False, **d):
+def make_tp(forgiving=False, takes_extras=False, **d):
     return apply_dataclass(TrainParams, d, forgiving=forgiving)
     # ready for fixes over time
 

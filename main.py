@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-from data.dataloader import dp_from_dict
-from model.model_params import mp_from_dict
+from data.data_params import make_dp, DataParams
+from model.model_params import make_mp, ModelParams
 from model.lm import LM
 from train.trainer import Trainer
-from train.train_params import tp_from_dict
+from train.train_params import make_tp, TrainParams
 import lightning as pl
 import argparse
 from dataclasses import asdict
@@ -111,18 +111,11 @@ def read_config(config_filename):
 
 
 def get_params(config_filename):
-    dp = dp_from_dict()
-    tp = tp_from_dict()
-    mp = mp_from_dict()
     overwrites = read_config(config_filename)
-    for params, news, name in [(dp, overwrites["DataParams"], "dp"),
-                               (tp, overwrites["TrainParams"], "tp"),
-                               (mp, overwrites["ModelParams"], "mp")]:
-        for k, v in news.items():
-            fail_str = f"tried to write param {k,v} to {name}," +\
-                        "but it has no such attribute"
-            assert k in dir(params), fail_str
-            setattr(params, k, v)
+    dp = make_dp(**overwrites["DataParams"])
+    tp = make_tp(**overwrites["TrainParams"])
+    mp = make_mp(**overwrites["ModelParams"])
+    assert None not in [dp, tp, mp]
     return dp, tp, mp
 
 
@@ -257,6 +250,10 @@ def get_config_filenames(config_name):
 
 
 def run_all(args, dp, tp, mp, namer):
+    # dp, tp, mp have been manipulated on the way here, remake to be sure
+    dp = make_dp(**asdict(dp), redo_synth_eval=True)
+    tp = make_tp(**asdict(tp))
+    mp = make_mp(**asdict(mp))
     namer.set_config_ablation("main")
     namer.set_config(dp, tp, mp)
     if args.no_wandb:

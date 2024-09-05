@@ -17,7 +17,7 @@ class ModelParams:
     individual_head_params: bool = False
     pos_encoding: str = "learned"
 
-def mp_from_dict(forgiving=False, **d):
+def make_mp(forgiving=False, takes_extras=False, **d):
     return apply_dataclass(ModelParams, d, forgiving=forgiving)
     # ready for fixes over time
 

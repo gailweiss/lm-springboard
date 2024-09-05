@@ -27,7 +27,7 @@ class SyntheticData:
         self.sizes[name] = int(size)
 
 
-default_size = 5e4
+default_size = 1e6
 syntheticdatasets = SyntheticData()
 
 
@@ -50,10 +50,10 @@ def histogram():
 
 @registered()
 def long_addition():
-    n1 = random.randint(0, 10)  # up to 10 digits
-    n2 = random.randint(0, 10)
-    a = random.randint(0, 9*pow(10, n1))
-    b = random.randint(0, 9*pow(10, n2))
+    n1 = random.randint(2, 20)
+    n2 = random.randint(2, 20)
+    a = random.randint(0, pow(10, n1))
+    b = random.randint(0, pow(10, n2))
     return f"{a}+{b}={a}+{b}={a+b}"
 
 
@@ -69,7 +69,7 @@ def doublehistogram():
 
 @registered()
 def sort():
-    n = random.randint(0, 60)
+    n = random.randint(10, 60)
     # 2*60 +~10 = 130 < 200 (normally my max length is 200)
     vocab = string.ascii_lowercase + string.ascii_uppercase + string.digits
     letters = ''.join(random.choices(vocab, k=n))
@@ -78,7 +78,7 @@ def sort():
 
 @registered()
 def copy():
-    n = random.randint(0, 60)
+    n = random.randint(10, 60)
     # 2*60 +~10 = 130 < 200 (normally my max length is 200)
     vocab = string.ascii_lowercase + string.ascii_uppercase + string.digits
     letters = ''.join(random.choices(vocab, k=n))
@@ -88,7 +88,7 @@ def copy():
 @registered()
 def numbersort():
     # going to sort 3-digit numbers
-    n = random.randint(0, 30)
+    n = random.randint(10, 30)
     # (30*4)*3 + ~10 = 370  -> need to be running at length up to 370
     numbers = [random.randint(0, 999) for _ in range(n)]
 

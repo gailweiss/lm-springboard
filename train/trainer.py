@@ -33,6 +33,8 @@ class Trainer(pl.LightningModule):
         self.last_checkpoint_i = -1
         self.last_checkpoint_nsamples = -1
         self.stat_syncer = 0
+        self.curr_epoch = -1
+        self.val_count_in_epoch = -1
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
@@ -88,6 +90,11 @@ class Trainer(pl.LightningModule):
         if None is not self.start_time:
             self.log_stat("process_time", process_time() - self.start_time)
 
+    def on_train_epoch_start(self):
+        self.curr_epoch += 1
+        self.val_count_in_epoch = -1
+        print("starting epoch:",self.curr_epoch)
+
     def on_train_epoch_end(self):
         # note that averaging accs will give "average batch accuracy" but not
         # actual full dataset accuracy (as batches may have different numbers
@@ -104,6 +111,7 @@ class Trainer(pl.LightningModule):
         # note that averaging accs will give "average batch accuracy" but not
         # actual full dataset accuracy (as batches may have different numbers
         # of tokens)
+        self.val_count_in_epoch += 1
         self.log_time()
         main = self.curr_val_stats_by_type["loss"]["main"]
         for sn in self.curr_val_stats_by_type:
@@ -113,9 +121,13 @@ class Trainer(pl.LightningModule):
             self.curr_val_stats_by_type[sn] = {}
 
         val_loss = wary_mean(main)
+
+        print(f"\n {'='*20} \n epoch [{self.curr_epoch}] val cycle",
+              f"[{self.val_count_in_epoch}] val loss: [{val_loss}]",
+              f"\n {'='*20} \n ")
         self.last_val_loss = val_loss  # might want this e.g. in model_explorer
         if self.samples_at_validation:
-            print("====\ncurrent val loss:", val_loss, ", sampling: ====")
+            print("=== sampling: ===")
             sample = self.model.sample(
                         max_seq_len=self.train_params.max_sample_tokens,
                         temperature=self.train_params.sample_temperature)
