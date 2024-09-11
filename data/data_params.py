@@ -17,14 +17,16 @@ class DataParams:
     total_samples: int = -1  # set internally, for later analysis
 
 
-def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False, **d):
+def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
+             convert_lists_to_tuples=False, **d):
     # correct old data_params to new attr:
     synth_task_note = "is_synthetic_task"
     if synth_task_note in d:
         d["task_type"] = "synthetic" if d[synth_task_note] else "natural"
         del d[synth_task_note]
 
-    res = apply_dataclass(DataParams, d, forgiving=forgiving)
+    res = apply_dataclass(DataParams, d, forgiving=forgiving,
+                          convert_lists_to_tuples=convert_lists_to_tuples)
 
     if redo_synth_eval or d.get("task_type", "?") == "?":
         set_synthetic_task_flag(res)

@@ -112,9 +112,9 @@ def read_config(config_filename):
 
 def get_params(config_filename):
     overwrites = read_config(config_filename)
-    dp = make_dp(**overwrites["DataParams"])
-    tp = make_tp(**overwrites["TrainParams"])
-    mp = make_mp(**overwrites["ModelParams"])
+    dp = make_dp(**overwrites["DataParams"], convert_lists_to_tuples=False)
+    tp = make_tp(**overwrites["TrainParams"], convert_lists_to_tuples=False)
+    mp = make_mp(**overwrites["ModelParams"], convert_lists_to_tuples=False)
     assert None not in [dp, tp, mp]
     return dp, tp, mp
 
