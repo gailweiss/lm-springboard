@@ -3,7 +3,7 @@ import lightning as pl
 import torch
 from copy import deepcopy
 import datasets
-from data.syntheticdata import syntheticdatasets
+from data.syntheticdata import syntheticdatasets, SyntheticSamplesIterator
 from data.data_params import make_dp
 from os.path import join as path_join
 from model.tokenizer import load_stored_tokenizer_if_exists
@@ -62,10 +62,16 @@ def get_data(data_params):
         raise Exception(f"unknown dataset: {data_params.dataset_name}")
     if data_params.debug_crop:
         data_params.debug_crop = int(data_params.debug_crop)
-        if isinstance(samples, list):
-            samples = samples[:data_params.debug_crop]
+        def apply_crop(it):
+            if isinstance(it, SyntheticSamplesIterator):
+                return it.cropped(data_params.debug_crop)
+            else:
+                return it[:data_params.debug_crop]
+        if isinstance(samples, list) or \
+           isinstance(samples, SyntheticSamplesIterator):
+            samples = apply_crop(samples)
         else:
-            samples = {n: samples[n][:data_params.debug_crop] for n in samples}
+            samples = {n: apply_crop(samples[n]) for n in samples}
     return samples
 
 
@@ -135,7 +141,8 @@ class LMDataModule(pl.LightningDataModule):
             self.tokenizer = tokenizer
             self.set_max_seq_len()
 
-            if isinstance(data, list):
+            if isinstance(data, list) or \
+               isinstance(data, SyntheticSamplesIterator):
                 self.setup_from_list(data)
             else:  # DatasetDict through huggingface
                 self.setup_from_data_dict(data)

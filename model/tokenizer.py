@@ -1,3 +1,4 @@
+from data.syntheticdata import SyntheticSamplesIterator
 from transformers import BertTokenizer, GPT2Tokenizer
 from util import timed
 import tokenizers
@@ -63,7 +64,7 @@ class CharTokenizer:
 
     def make_tokens(self, data):
         tokens = set()
-        assert isinstance(data, list)
+        assert isinstance(data, list) or isinstance(data, SyntheticSamplesIterator)
         for s in data:
             tokens.update(list(s))
         tokens.update(self.special_tokens)

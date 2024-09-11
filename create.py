@@ -1,4 +1,5 @@
 from data.dataloader import get_data, LMDataModule, datamodules_paths
+from data.syntheticdata import SyntheticSamplesIterator
 from model.tokenizer import MyTokenizer
 from model.transformer.transformer import Transformer
 from model.lm import LM
@@ -18,8 +19,8 @@ def make_datamodule(data_params, model_params, verbose=True,
     # level tokenizer
     plain_data = get_data(data_params)
 
-    def as_list(d):
-        if isinstance(d, list):
+    def as_iterable(d):
+        if isinstance(d, list) or isinstance(d, SyntheticSamplesIterator):
             return d
         else:
             return d["train"] + d["validation"] + d["test"]
@@ -32,7 +33,7 @@ def make_datamodule(data_params, model_params, verbose=True,
 
     # 2. make base tokenizer
     custom_tokenizer_ntokens = model_params.custom_tokenizer_ntokens
-    tokenizer = MyTokenizer(remove_type_markers(as_list(plain_data)),
+    tokenizer = MyTokenizer(remove_type_markers(as_iterable(plain_data)),
                             name=model_params.tokenizer_source_name,
                             custom_vocab_size=custom_tokenizer_ntokens,
                             verbose_init=verbose)

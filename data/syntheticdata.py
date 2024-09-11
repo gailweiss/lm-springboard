@@ -1,5 +1,29 @@
 import random
 import string
+from copy import deepcopy
+
+
+class SyntheticSamplesIterator:
+    def __init__(self, generator, size):
+        self.generator = generator
+        self.size = size
+
+    def __getitem__(self, i):
+        if i >= self.size:
+            raise IndexError
+        s = random.getstate()
+        random.seed(i)
+        res = self.generator()
+        random.setstate(s)
+        return res
+
+    def __len__(self):
+        return self.size
+
+    def cropped(self, crop):
+        res = deepcopy(self)
+        res.size = crop
+        return res
 
 
 class SyntheticData:
@@ -15,12 +39,9 @@ class SyntheticData:
 
     def get(self, name):
         f = self.generators[name]
-        random.seed(0)  # for reproducibility (specifically if want to
-        # return to a specific model and compare to its recorded validation
-        # loss etc), initiate the random generator to the same number
-        # whenever creating a synthetic dataset
-        res = [f() for _ in range(self.sizes[name])]
-        return res
+        # as of 2024.09.11 : random seed choice has changed,
+        # comparison of new loss curves to existing ones not reliable
+        return SyntheticSamplesIterator(f, self.sizes[name])
 
     def register(self, name, f, size):
         self.generators[name] = f
