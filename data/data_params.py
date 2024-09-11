@@ -21,8 +21,8 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False, **d):
     # correct old data_params to new attr:
     synth_task_note = "is_synthetic_task"
     if synth_task_note in d:
-        d["task_type"] = "synthetic" if d["is_synthetic_task"] else "natural"
-        del d["is_synthetic_task"]
+        d["task_type"] = "synthetic" if d[synth_task_note] else "natural"
+        del d[synth_task_note]
 
     res = apply_dataclass(DataParams, d, forgiving=forgiving)
 
