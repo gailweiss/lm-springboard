@@ -93,16 +93,18 @@ Independently of wandb logging, saved models also save their recorded losses, an
 Run 
 
 ```
-model_explorer.plot_metric(train_stats,"validation_loss")
+model_explorer.plot_metrics(timestamp ,"stat/val_loss:main")
 ```
 
 to see the validation losses over time (measured in number of trained samples) of the model you have loaded. You can also plot any other metric in `train_stats`, you can list these by running `list(train_stats.keys())`
 
-You can also save this plot by passing the argument `folder_name` to `plot_metric`. It will save the plot in `../metrics/{folder_name}/{metric_name}.png` relative to `main.py`.
+You can also save this plot by passing the argument `filename` to `plot_metric`. It will save the plot in `../metrics/{filename}.png` relative to `main.py`.
 
 In case you wish to plot something more complicated, here is a description of `train_stats` to help you: 
 
 `train_stats` is a dictionary of all the metrics tracked in `lmtrainer.py` with the function `log_stat` during training training. Its keys are the names of all these metrics. Each individual metric is stored as a list of tuples `(n,v,c)` as follows: `v` is a value of the metric, `n` is the number of samples that had been trained on up until recording this value, and `c` is the stats counter - the number of values stored in `train_stats` (across all metrics) when this tuple was added. These lists of tuples are each sorted in increasing order of `c`. 
+
+Each individual metric is stored as a list of tuples `(s,n,c,v)` as follows: `s` is the number of training steps so far, `n` is the number of samples that had been trained on up until recording this value, `c` is the stats counter and `v` is the value of the metric.
 
 ## Load GPT2-small
 

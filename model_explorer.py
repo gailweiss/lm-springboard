@@ -358,7 +358,7 @@ def compute_validation(lm, dataset, params, sample=True):
 
 
 def check_validation(loaded_model):
-    recorded_val_loss = loaded_model["train_stats"]["val_loss:main"][-1][1]
+    recorded_val_loss = loaded_model["train_stats"]["stat/val_loss:main"][-1][-1]
     curr_val_loss = compute_validation(loaded_model["lm"], 
                                        loaded_model["dataset"],
                                        loaded_model["params"], sample=False)

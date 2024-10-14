@@ -20,7 +20,7 @@ try:
                              l.startswith("#")]
 except Exception as e:
     print("couldnt find extra models paths")
-    models_paths = "../saved-models"
+    models_paths = ["../saved-models"]
 
 
 final_chkpt = "final"
@@ -117,7 +117,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
 
     res["lm"] = model_trainer.model
     res["lm"].eval()
-
+    
     return res
 
 
