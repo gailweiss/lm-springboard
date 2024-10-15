@@ -65,11 +65,11 @@ To load a model you have saved, open your terminal or a jupyter notebook, and ru
 ```
 import model_explorer
 timestamp = {timestamp}  # your timestamp here
-results = model_explorer.get_model_by_timestamp(timestamp)
+results  = model_explorer.get_model_by_timestamp(timestamp)
 ```
 where `{timestamp}` is the timestamp of your saved model as it appears in its containing folder's path (see above), e.g. `timestamp = "2024-04-22--16-17-00"`. 
 
-This function returns a dictionary with 4 keys: `lm`, `dataset`, `train_stats`, and `params`. 
+This function returns 4 values, `lm`, `dataset`, `train_stats`, and `params`. 
 
 - `lm` is an `LM` as defined in `models/lm.py`, you can see examples on how to use it below. 
 - `dataset` is an `LMDataModule` as defined in `data/dataloader.py`, it can return torch dataloaders with the functions `train_dataloader`, `test_dataloader`, and `val_dataloader`, each of which receive a requested batch size. You can also see a nice print of each of its samples with the function `show_sample`, which expects a sample index - e.g. `dataset.show_sample(1)`. 
