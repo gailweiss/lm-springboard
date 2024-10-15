@@ -65,11 +65,11 @@ To load a model you have saved, open your terminal or a jupyter notebook, and ru
 ```
 import model_explorer
 timestamp = {timestamp}  # your timestamp here
-lm, dataset, train_stats, params = model_explorer.get_model_by_timestamp(timestamp)
+results = model_explorer.get_model_by_timestamp(timestamp)
 ```
 where `{timestamp}` is the timestamp of your saved model as it appears in its containing folder's path (see above), e.g. `timestamp = "2024-04-22--16-17-00"`. 
 
-This function returns 4 values, `lm`, `dataset`, `train_stats`, and `params`. 
+This function returns a dictionary with 4 keys: `lm`, `dataset`, `train_stats`, and `params`. 
 
 - `lm` is an `LM` as defined in `models/lm.py`, you can see examples on how to use it below. 
 - `dataset` is an `LMDataModule` as defined in `data/dataloader.py`, it can return torch dataloaders with the functions `train_dataloader`, `test_dataloader`, and `val_dataloader`, each of which receive a requested batch size. You can also see a nice print of each of its samples with the function `show_sample`, which expects a sample index - e.g. `dataset.show_sample(1)`. 
@@ -104,7 +104,7 @@ In case you wish to plot something more complicated, here is a description of `t
 
 `train_stats` is a dictionary of all the metrics tracked in `lmtrainer.py` with the function `log_stat` during training training. Its keys are the names of all these metrics. Each individual metric is stored as a list of tuples `(n,v,c)` as follows: `v` is a value of the metric, `n` is the number of samples that had been trained on up until recording this value, and `c` is the stats counter - the number of values stored in `train_stats` (across all metrics) when this tuple was added. These lists of tuples are each sorted in increasing order of `c`. 
 
-Each individual metric is stored as a list of tuples `(s,n,c,v)` as follows: `s` is the number of training steps so far, `n` is the number of samples that had been trained on up until recording this value, `c` is the stats counter and `v` is the value of the metric.
+Each individual metric is sto red as a list of tuples `(s,n,c,v)` as follows: `s` is the number of training steps so far, `n` is the number of samples that had been trained on up until recording this value, `c` is the stats counter and `v` is the value of the metric.
 
 ## Load GPT2-small
 
