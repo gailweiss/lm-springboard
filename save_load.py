@@ -11,6 +11,7 @@ from data.dataloader import get_existing_datamodule
 from data.data_params import make_dp
 import glob
 from util import printer_print as print
+from dataclasses import asdict
 
 
 try:
@@ -56,6 +57,14 @@ def load_model_info(folder_name, with_train_stats=False):
         res["params"]["data_params"] = make_dp(**json.load(f))
     with open(path_join(folder_name, "train_params.json"), "r") as f:
         res["params"]["train_params"] = make_tp(**json.load(f))
+    
+    for pn, pd in res["params"].items():
+        for k, v in asdict(pd).items():
+            if isinstance(v, list): 
+                # json turns tuples into lists, but saved configs (i.e.
+                # true configs, not config 'lists') don't have lists: correct
+                setattr(pd, k, tuple(v))
+
 
     if with_train_stats:
         with open(path_join(folder_name, "train_stats.json"), "r") as f:
