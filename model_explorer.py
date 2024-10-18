@@ -107,6 +107,7 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None):
     # note this ties into constraints on parameters in other places - 
     # lists in the config files are treated as lists of values to run
     # rather than a single value (that is a list) for that parameter
+    # min_date/max_date example format: "2024-10-17--00-00-00"
     identifiers_dict = auto_identifiers()
     dataset_names = kws.get("data_params", {}).get("dataset_name", [])
     if not isinstance(dataset_names, list):
