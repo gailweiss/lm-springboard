@@ -433,7 +433,8 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  title=None, filename=None, colors=None,
                  ylabel_ax1=None, ylabel_ax2=None, 
                  add_to=None, plot_type="scatter", stylist=None,
-                 max_x=None, min_x=None, max_y=None, min_y=None):
+                 max_x=None, min_x=None, max_y=None, min_y=None,
+                 legend_markerscale=10):
     # identifiers can be a dict giving the identifiers special names for 
     # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name)
@@ -497,13 +498,15 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                 if "label" not in extra_kwargs:
                     extra_kwargs["label"] = _line_label(i, m, identifiers,
                         all_metric_names, shared_ylabel, metric_names)
+                if "marker" not in extra_kwargs:
+                    extra_kwargs["marker"] = "."
                 artists.append(
                     _plot(ax, n_train_samples, metric, plot_type=plot_type, 
                     max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
                     extra_kwargs=extra_kwargs))
     
     
-    ax1.legend(artists, [a.get_label() for a in artists], markerscale=3)
+    ax1.legend(artists, [a.get_label() for a in artists], markerscale=legend_markerscale)
 
     fig = plt.gcf()
     fig.show()
