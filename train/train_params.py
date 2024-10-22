@@ -79,6 +79,10 @@ class TrainParams:
 #           learning rate lr and reduces the learning rate by scheduler_factor
 #           every time the train batch loss ceases improving for patience
 #           steps, reducing the learning rate only up to min_lr.
+#       "Linear":
+#           Uses torch.optim.lr_scheduler.LinearLR. Starts from lr and decreases
+#           the learning rate linearly down to min_lr over the course of
+#           training steps, as defined by the total training duration.
 # min_lr:
 #   The minimum learning rate the scheduler may set in training
 # scheduler_factor:
