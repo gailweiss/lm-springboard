@@ -22,6 +22,8 @@ from time import process_time, sleep
 import os
 from os.path import join as path_join
 import sys
+import numpy as np
+import random
 
 # not trying to parallelize the tokenizer, i tokenize everything first and then
 # load tokens (not sequences) later. (may want to change this in future, if
@@ -42,10 +44,11 @@ parser.add_argument('--gpu-id', type=int, default=None)
 # for internal debug use (can be passed to get_exception at the bottom here):
 parser.add_argument('--return-things', type=bool, default=False)
 parser.add_argument('--keep-datamodule', action='store_true')
+parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
 
 
-MAIN_PROJ = "base"  # project name for wandb runs
-wandb_username = "gail_weiss"
+MAIN_PROJ = "grokking"  # project name for wandb runs
+wandb_username = "amunozo"
 
 
 class Namer:
@@ -80,6 +83,26 @@ class Namer:
         return f"{self.args.config}/{self.dp.dataset_name}/" +\
                f"{wn}{self.timestamp}"
 
+
+def seed_everything(seed=None):
+    if seed is None:
+        seed = random.randint(0, 2**32 - 1)
+        print(f"No seed provided. Using generated seed: {seed}")
+    else:
+        print(f"Using provided seed: {seed}")
+    
+    pl.seed_everything(seed)
+    
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    return seed
 
 def build_full(dp, tp, mp):
     full = {}
@@ -127,6 +150,7 @@ def get_params(config_filename):
 
 
 def train(args, lm, dataset, tp, dp, saving_folder):
+    torch.autograd.set_detect_anomaly(True)
     # dp and saving_folder are for saving checkpoints
     tokenizer = lm.tokenizer
     start_time = process_time()
@@ -283,6 +307,7 @@ def run_main(arg_bits_list=None):
     args = get_args(arg_bits_list)
     namer = Namer(args)
     print("got config name:", args.config)
+    seed = seed_everything(args.seed)
     config_index = 0
     run_all_args = []
     for filename in get_config_filenames(args.config):
