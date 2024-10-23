@@ -47,8 +47,8 @@ parser.add_argument('--keep-datamodule', action='store_true')
 parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
 
 
-MAIN_PROJ = "grokking"  # project name for wandb runs
-wandb_username = "amunozo"
+MAIN_PROJ = "base"  # project name for wandb runs
+wandb_username = "gail_weiss"
 
 
 class Namer:
