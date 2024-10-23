@@ -18,9 +18,13 @@ try:
         # e.g. ../saved-models, or more complicated if using cloud services
         models_paths = [l.strip("\n") for l in models_paths if not
                              l.startswith("#")]
+        # models will be saved specifically in the first path in this file. 
+        # however, model_explorer.py will use *all* of the paths listed in 
+        # this file to find models.
+
 except Exception as e:
     print("couldnt find extra models paths")
-    models_paths = "../saved-models"
+    models_paths = ["../saved-models"]
 
 
 final_chkpt = "final"
