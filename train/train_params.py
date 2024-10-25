@@ -33,6 +33,7 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
                            convert_lists_to_tuples=convert_lists_to_tuples)
     # ready for fixes over time
 
+    seed: int
 
 # batch_size:
 #   The batch size used for the training and validation sets
@@ -110,3 +111,5 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #   overridden to 0.
 # early_stop_nsamples:
 #   When >0, the number of batches to train before early stopping the training.
+# seed:
+#   Random seed for reproducibility

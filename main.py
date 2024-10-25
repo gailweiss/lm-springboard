@@ -84,13 +84,13 @@ class Namer:
                f"{wn}{self.identifier}"
 
 
-def seed_everything(seed=None):
-    if seed is None:
-        seed = random.randint(0, 2**32 - 1)
-        print(f"No seed provided. Using generated seed: {seed}")
-    else:
-        print(f"Using provided seed: {seed}")
-    
+def seed_everything(args_seed, tp):
+    if None is not args_seed:
+        tp.random_seed = args_seed # i.e., args_seed is stronger than config, if set
+    if None is tp.random_seed: 
+        tp.random_seed = random.randint(0,2**32 -1 )
+    seed = tp.random_seed
+
     pl.seed_everything(seed)
     
     torch.manual_seed(seed)
@@ -148,7 +148,6 @@ def get_params(config_filename):
 
 
 def train(args, lm, dataset, tp, dp, saving_folder):
-    torch.autograd.set_detect_anomaly(True)
     # dp and saving_folder are for saving checkpoints
     tokenizer = lm.tokenizer
     start_time = process_time()
@@ -230,6 +229,7 @@ def save_model(args, saving_folder, pltrainer, dp, tp):
 
 
 def run_config(args, dp, tp, mp, namer):
+    seed = seed_everything(args.seed, tp)
     full_params = build_full(dp, tp, mp)
     run, run_name, run_loc = setup_wandb(args, tp, full_params, namer)
     saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
@@ -306,10 +306,10 @@ def get_args(arg_bits_list):
 
 
 def run_main(arg_bits_list=None):
+    torch.autograd.set_detect_anomaly(True)
     args = get_args(arg_bits_list)
     namer = Namer(args)
     print("got config name:", args.config)
-    seed = seed_everything(args.seed)
     config_index = 0
     run_all_args = []
     for filename in get_config_filenames(args.config):
