@@ -89,7 +89,7 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #           every time the train batch loss ceases improving for patience
 #           steps, reducing the learning rate only up to min_lr.
 #       "Linear":
-#           Uses torch.optim.lr_scheduler.LinearLR. Starts from lr and decreases
+#           Uses torch.optim.lr_scheduler.LambdaLR. Starts from lr and decreases
 #           the learning rate linearly down to min_lr over the course of
 #           training steps, as defined by the total training duration.
 # min_lr:

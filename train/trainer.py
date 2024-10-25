@@ -247,7 +247,7 @@ class Trainer(pl.LightningModule):
             return sched(optimizer, self.train_params.lr_cycle_steps,
                         eta_min=self.train_params.min_lr)
         elif self.train_params.lr_scheduler_type == 'Linear':
-            sched = torch.optim.lr_scheduler.LinearLR
+            sched = torch.optim.lr_scheduler.LambdaLR
             return sched(optimizer, start_factor=1.0,
                         end_factor=self.train_params.min_lr / self.train_params.lr,
                         total_iters=self.train_params.epochs * self.train_params.accumulate_grad_batches)
