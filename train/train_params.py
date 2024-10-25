@@ -25,15 +25,7 @@ class TrainParams:
     lora_std: float = 0.02
     checkpoint_every: int = 0
     early_stop_nsamples: int = -1
-
-
-def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
-            **d):
-    return apply_dataclass(TrainParams, d, forgiving=forgiving,
-                           convert_lists_to_tuples=convert_lists_to_tuples)
-    # ready for fixes over time
-
-    seed: int
+    weight_decay: float = 0.01
 
 # batch_size:
 #   The batch size used for the training and validation sets
