@@ -52,7 +52,7 @@ def make_datamodule(data_params, model_params, verbose=True,
     return dataset
 
 
-def make_model(model_params, train_params, tokenizer):    
+def make_model(model_params, train_params, tokenizer):
     if "transformer" in model_params.layer_architecture:
         model = Transformer(model_params, train_params)
     else:  # hoping to add e.g. RNNs, S6, etc in the future
