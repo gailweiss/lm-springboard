@@ -44,7 +44,7 @@ parser.add_argument('--gpu-id', type=int, default=None)
 # for internal debug use (can be passed to get_exception at the bottom here):
 parser.add_argument('--return-things', type=bool, default=False)
 parser.add_argument('--keep-datamodule', action='store_true')
-parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
+parser.add_argument('--random_seed', type=int, default=None, help='Random seed for reproducibility')
 
 
 MAIN_PROJ = "grokking"  # project name for wandb runs
@@ -229,7 +229,7 @@ def save_model(args, saving_folder, pltrainer, dp, tp):
 
 
 def run_config(args, dp, tp, mp, namer):
-    seed = seed_everything(args.seed, tp)
+    seed = seed_everything(args.random_seed, tp)
     full_params = build_full(dp, tp, mp)
     run, run_name, run_loc = setup_wandb(args, tp, full_params, namer)
     saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"

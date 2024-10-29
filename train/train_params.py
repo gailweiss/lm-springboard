@@ -26,6 +26,7 @@ class TrainParams:
     checkpoint_every: int = 0
     early_stop_nsamples: int = -1
     weight_decay: float = 0.01
+    random_seed: None = None
 
 # batch_size:
 #   The batch size used for the training and validation sets
@@ -103,5 +104,7 @@ class TrainParams:
 #   overridden to 0.
 # early_stop_nsamples:
 #   When >0, the number of batches to train before early stopping the training.
+# weight_decay:
+#   Weight decay to apply to the optimizer.
 # seed:
 #   Random seed for reproducibility
