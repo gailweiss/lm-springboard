@@ -106,5 +106,5 @@ class TrainParams:
 #   When >0, the number of batches to train before early stopping the training.
 # weight_decay:
 #   Weight decay to apply to the optimizer.
-# seed:
+# random_seed:
 #   Random seed for reproducibility
