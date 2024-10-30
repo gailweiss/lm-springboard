@@ -8,7 +8,7 @@ from torch.optim import AdamW
 
 class Trainer(pl.LightningModule):
     def __init__(self, model, train_params, start_time=None,
-                 samples_at_validation=True):
+                 samples_at_validation=True, expected_batches_per_epoch=None):
         super().__init__()
         self.model = model
         self.train_params = train_params
@@ -34,6 +34,8 @@ class Trainer(pl.LightningModule):
         self.last_checkpoint_i = -1
         self.last_checkpoint_nsamples = -1
         self.stat_syncer = 0
+        self.expected_batches_per_epoch = expected_batches_per_epoch
+        self.weight_norms = self.get_weight_norms()
         self.curr_epoch = -1
         self.val_count_in_epoch = -1
         self.log_stat("n_train_samples", self.n_train_samples)
@@ -201,11 +203,14 @@ class Trainer(pl.LightningModule):
         self.log("train_batch_loss", losses["main"].item())
         # for the lr scheduler
 
+        self.weight_norms = self.get_weight_norms()
+
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
-
+        self.log_stat("weight_norms", self.weight_norms)
+        
         self.manual_backward(losses["main"])
         self.maybe_step_opt_and_lr(batch_idx)
 
@@ -297,14 +302,14 @@ class Trainer(pl.LightningModule):
         return [optimizer], [s_main]
 
 
-    def log_weight_norms(self):
+    def get_weight_norms(self):
         total_norm = 0
         for p in self.model.parameters():
             if p.requires_grad:
                 param_norm = p.data.norm(2)
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
-        self.log_stat("total_weight_norm", total_norm)
+        return total_norm
 
 
 class MyChainedScheduler:
