@@ -8,7 +8,7 @@ from torch.optim import AdamW
 
 class Trainer(pl.LightningModule):
     def __init__(self, model, train_params, start_time=None,
-                 samples_at_validation=True, expected_batches_per_epoch=None):
+                 samples_at_validation=True):
         super().__init__()
         self.model = model
         self.train_params = train_params
@@ -34,8 +34,6 @@ class Trainer(pl.LightningModule):
         self.last_checkpoint_i = -1
         self.last_checkpoint_nsamples = -1
         self.stat_syncer = 0
-        self.expected_batches_per_epoch = expected_batches_per_epoch
-        self.weight_norms = self.get_weight_norms()
         self.curr_epoch = -1
         self.val_count_in_epoch = -1
         self.log_stat("n_train_samples", self.n_train_samples)
