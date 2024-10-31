@@ -250,9 +250,15 @@ class Trainer(pl.LightningModule):
                          eta_min=self.train_params.min_lr)
         elif self.train_params.lr_scheduler_type == 'Linear':
             sched = torch.optim.lr_scheduler.LinearLR
+            total_expected_batches = (
+                self.train_params.epochs *
+                self.expected_batches_per_epoch *
+                self.train_params.accumulate_grad_batches -
+                self.train_params.lr_warm_steps
+            )
             return sched(optimizer, start_factor=1.0,
                          end_factor=self.train_params.min_lr / self.train_params.lr,
-                         total_iters=total_iters)
+                         total_iters=total_expected_batches)
         else:
             raise Exception("unknown scheduler type:",
                             self.train_params.lr_scheduler_type)
