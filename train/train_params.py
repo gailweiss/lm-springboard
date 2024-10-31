@@ -104,4 +104,5 @@ class TrainParams:
 # early_stop_nsamples:
 #   When >0, the number of batches to train before early stopping the training.
 # random_seed:
-#   Random seed for reproducibility.
+#   Random seed for reproducibility. This value can be overwritten by setting
+#   the random seed arg in the main.py script.
