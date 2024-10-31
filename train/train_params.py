@@ -25,7 +25,6 @@ class TrainParams:
     lora_std: float = 0.02
     checkpoint_every: int = 0
     early_stop_nsamples: int = -1
-    weight_decay: float = 0.01
     random_seed: None = None
 
 # batch_size:
@@ -104,7 +103,5 @@ class TrainParams:
 #   overridden to 0.
 # early_stop_nsamples:
 #   When >0, the number of batches to train before early stopping the training.
-# weight_decay:
-#   Weight decay to apply to the optimizer.
 # random_seed:
-#   Random seed for reproducibility
+#   Random seed for reproducibility.
