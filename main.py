@@ -131,13 +131,13 @@ def train(args, lm, dataset, tp, dp, saving_folder):
         # device, else it runs all of main.py n_devices times (????).
         # presumably its for multi-gpu training but i haven't learned how yet
         max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
-    
+    tdl = dataset.train_dataloader(tp.batch_size)
     mytrainer = Trainer(lm, tp, 
-                        expected_batches_per_epoch=len(dataset.train_dataloader(tp.batch_size)), 
+                        expected_batches_per_epoch=len(tdl), 
                         start_time=start_time)
     mytrainer.prepare_saver(dp, saving_folder, save_model_)
 
-    pltrainer.fit(mytrainer, dataset.train_dataloader(tp.batch_size),
+    pltrainer.fit(mytrainer, tdl,
                   dataset.val_dataloader(tp.batch_size))
     pltrainer.validate(mytrainer,
                        dataloaders=dataset.val_dataloader(tp.batch_size))
