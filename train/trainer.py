@@ -289,9 +289,11 @@ class Trainer(pl.LightningModule):
         
         s_warmup = torch.optim.lr_scheduler.LambdaLR(optimizer, f_warmup)
         s_main = self.make_main_scheduler(optimizer)
-        s_full = MyChainedScheduler() if existing_scheduler is None else existing_scheduler
+        s_full = MyChainedScheduler() if existing_scheduler is None else \
+            existing_scheduler
         s_full.setup(optimizer, [s_warmup, s_main],
                     milestones=[self.train_params.lr_warm_steps])
+        # get scheduler started, else first batch has max value apparently
         s_full.step(None)
         s_main = {"scheduler": s_full}
 
