@@ -259,6 +259,8 @@ class Trainer(pl.LightningModule):
         self.optimizers()._optimizer = optimizers[0]
     
     def get_optimizer_params(self, weight_decay):
+        if weight_decay <= 0:
+            return self.parameters()
         decay_params = []
         no_decay_params = []
         for name, param in self.model.named_parameters():
