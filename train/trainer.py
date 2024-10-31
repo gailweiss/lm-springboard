@@ -278,11 +278,10 @@ class Trainer(pl.LightningModule):
     def configure_optimizers(self, existing_scheduler=None):
         weight_decay = self.train_params.weight_decay
 
-        if weight_decay > 0:
-            optimizer_grouped_parameters = self.get_optimizer_params(weight_decay)
-            optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=self.train_params.lr)
-        else:
-            optimizer = torch.optim.Adam(self.parameters(), lr=self.train_params.lr)
+        optimizer_params = self.get_optimizer_params(weight_decay)
+        optimizerClass = torch.optim.AdamW if weight_decay > 0 else \
+            torch.optim.Adam
+        optimizer = optimizerClass(optimizer_params, lr=self.train_params.lr)
 
         def f_warmup(n):
             assert n <= self.train_params.lr_warm_steps
