@@ -257,7 +257,6 @@ class Trainer(pl.LightningModule):
             raise Exception("unknown scheduler type:",
                             self.train_params.lr_scheduler_type)
 
-
     def reconfigure_optimizers(self):
         optimizers, _ = self.configure_optimizers(
             existing_scheduler=self.lr_schedulers())
