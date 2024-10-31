@@ -283,10 +283,8 @@ class Trainer(pl.LightningModule):
             optimizer = torch.optim.Adam(self.parameters(), lr=self.train_params.lr)
 
         def f_warmup(n):
-            if self.train_params.lr_warm_steps > 0:
-                return min(n / self.train_params.lr_warm_steps, 1.0)
-            else:
-                return 1.0
+            assert n <= self.train_params.lr_warm_steps
+            return n / self.train_params.lr_warm_steps
         
         s_warmup = torch.optim.lr_scheduler.LambdaLR(optimizer, f_warmup)
         s_main = self.make_main_scheduler(optimizer)
