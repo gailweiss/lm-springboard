@@ -7,7 +7,8 @@ from util import printer_print as print
 
 class Trainer(pl.LightningModule):
     def __init__(self, model, train_params, start_time=None,
-                 samples_at_validation=True, expected_batches_per_epoch=None):
+                 samples_at_validation=True, 
+                 expected_batches_per_epoch=None):
         super().__init__()
         self.model = model
         self.train_params = train_params
@@ -232,26 +233,26 @@ class Trainer(pl.LightningModule):
         if self.train_params.lr_scheduler_type == 'Plateau':
             sched = torch.optim.lr_scheduler.ReduceLROnPlateau
             return sched(optimizer, mode='min', verbose=False,
-                        min_lr=self.train_params.min_lr,
-                        factor=self.train_params.scheduler_factor,
-                        patience=self.train_params.patience)
+                         min_lr=self.train_params.min_lr,
+                         factor=self.train_params.scheduler_factor,
+                         patience=self.train_params.patience)
         elif self.train_params.lr_scheduler_type == 'Cyclic':
             sched = torch.optim.lr_scheduler.CyclicLR
             return sched(optimizer, base_lr=self.train_params.min_lr,
-                        max_lr=self.train_params.lr,
-                        step_size_up=self.train_params.lr_cycle_steps // 2,
-                        mode='triangular',
-                        gamma=self.train_params.scheduler_factor,
-                        cycle_momentum=False)
+                         max_lr=self.train_params.lr,
+                         step_size_up=self.train_params.lr_cycle_steps // 2,
+                         mode='triangular',
+                         gamma=self.train_params.scheduler_factor,
+                         cycle_momentum=False)
         elif self.train_params.lr_scheduler_type == 'Cosine':
             sched = torch.optim.lr_scheduler.CosineAnnealingLR
             return sched(optimizer, self.train_params.lr_cycle_steps,
-                        eta_min=self.train_params.min_lr)
+                         eta_min=self.train_params.min_lr)
         elif self.train_params.lr_scheduler_type == 'Linear':
             sched = torch.optim.lr_scheduler.LinearLR
             return sched(optimizer, start_factor=1.0,
-                        end_factor=self.train_params.min_lr / self.train_params.lr,
-                        total_iters=total_iters)
+                         end_factor=self.train_params.min_lr / self.train_params.lr,
+                         total_iters=total_iters)
         else:
             raise Exception("unknown scheduler type:",
                             self.train_params.lr_scheduler_type)
