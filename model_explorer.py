@@ -434,7 +434,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  ylabel_ax1=None, ylabel_ax2=None, 
                  add_to=None, plot_type="scatter", stylist=None,
                  max_x=None, min_x=None, max_y=None, min_y=None,
-                 legend_markerscale=10):
+                 legend_markerscale=10, legend_outside=False):
     # identifiers can be a dict giving the identifiers special names for 
     # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name)
@@ -506,7 +506,12 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                     extra_kwargs=extra_kwargs))
     
     
-    ax1.legend(artists, [a.get_label() for a in artists], markerscale=legend_markerscale)
+    if legend_outside:
+        extra_kwargs = {'loc': 'center left', 'bbox_to_anchor': (1, 0.5)}
+    else:
+        extra_kwargs = {}
+    ax1.legend(artists, [a.get_label() for a in artists],
+               markerscale=legend_markerscale, **extra_kwargs)
 
     fig = plt.gcf()
     fig.show()
@@ -514,7 +519,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         fn = f"../metrics/{filename}"
         directory = '/'.join(fn.split('/')[:-1])
         prepare_directory(directory)
-        fig.savefig(f"{fn}.png")
+        fig.savefig(f"{fn}.png",bbox_inches='tight')
         with open(f"{fn}.txt", "w") as f:
             print(f"plot in {fn} made from identifiers:{identifiers}\n",
                   f"and metrics:\n{all_metric_names}",
