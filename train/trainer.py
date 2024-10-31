@@ -3,7 +3,6 @@ import torch
 import wandb
 from time import process_time
 from util import printer_print as print
-from torch.optim import AdamW
 
 
 class Trainer(pl.LightningModule):
@@ -279,7 +278,7 @@ class Trainer(pl.LightningModule):
 
         if weight_decay > 0:
             optimizer_grouped_parameters = self.get_optimizer_params(weight_decay)
-            optimizer = AdamW(optimizer_grouped_parameters, lr=self.train_params.lr)
+            optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=self.train_params.lr)
         else:
             optimizer = torch.optim.Adam(self.parameters(), lr=self.train_params.lr)
 
