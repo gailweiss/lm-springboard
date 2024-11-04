@@ -200,13 +200,11 @@ class Trainer(pl.LightningModule):
         self.log("train_batch_loss", losses["main"].item())
         # for the lr scheduler
 
-        self.weight_norms = self.get_weight_norms()
-
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
-        self.log_stat("weight_norms", self.weight_norms)
+        self.log_stat("weight_norms", self.get_weight_norms())
         
         self.manual_backward(losses["main"])
         self.maybe_step_opt_and_lr(batch_idx)
