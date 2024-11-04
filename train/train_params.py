@@ -25,6 +25,7 @@ class TrainParams:
     lora_std: float = 0.02
     checkpoint_every: int = 0
     early_stop_nsamples: int = -1
+    random_seed: int = None
 
 
 def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
@@ -110,3 +111,6 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #   overridden to 0.
 # early_stop_nsamples:
 #   When >0, the number of batches to train before early stopping the training.
+# random_seed:
+#   Random seed for reproducibility. This value can be overwritten by setting
+#   the random seed arg in the main.py script.
