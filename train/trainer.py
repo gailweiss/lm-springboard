@@ -8,7 +8,7 @@ from util import printer_print as print
 class Trainer(pl.LightningModule):
     def __init__(self, model, train_params, start_time=None,
                  samples_at_validation=True, 
-                 expected_batches_per_epoch=None):
+                 train_dataloader_nbatches=None):
         super().__init__()
         self.model = model
         self.train_params = train_params
@@ -36,7 +36,7 @@ class Trainer(pl.LightningModule):
         self.stat_syncer = 0
         self.curr_epoch = -1
         self.val_count_in_epoch = -1
-        self.expected_batches_per_epoch = expected_batches_per_epoch
+        self.train_dataloader_nbatches = train_dataloader_nbatches
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
@@ -252,7 +252,7 @@ class Trainer(pl.LightningModule):
             sched = torch.optim.lr_scheduler.LinearLR
             total_expected_batches = (
                 self.train_params.epochs *
-                self.expected_batches_per_epoch *
+                self.train_dataloader_nbatches *
                 self.train_params.accumulate_grad_batches -
                 self.train_params.lr_warm_steps
             )
