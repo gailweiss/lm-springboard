@@ -34,6 +34,7 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
                            convert_lists_to_tuples=convert_lists_to_tuples)
     # ready for fixes over time
 
+
 # batch_size:
 #   The batch size used for the training and validation sets
 # accumulate_grad_batches:
