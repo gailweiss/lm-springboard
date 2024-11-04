@@ -7,7 +7,8 @@ from util import printer_print as print
 
 class Trainer(pl.LightningModule):
     def __init__(self, model, train_params, start_time=None,
-                 samples_at_validation=True):
+                 samples_at_validation=True, 
+                 train_dataloader_nbatches=None):
         super().__init__()
         self.model = model
         self.train_params = train_params
@@ -35,6 +36,7 @@ class Trainer(pl.LightningModule):
         self.stat_syncer = 0
         self.curr_epoch = -1
         self.val_count_in_epoch = -1
+        self.train_dataloader_nbatches = train_dataloader_nbatches
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
@@ -247,6 +249,15 @@ class Trainer(pl.LightningModule):
             sched = torch.optim.lr_scheduler.CosineAnnealingLR
             return sched(optimizer, self.train_params.lr_cycle_steps,
                          eta_min=self.train_params.min_lr)
+        elif self.train_params.lr_scheduler_type == 'Linear':
+            sched = torch.optim.lr_scheduler.LinearLR
+            expected_main_scheduler_steps = (
+                (self.train_params.epochs * self.train_dataloader_nbatches) // 
+                self.train_params.accumulate_grad_batches
+            ) - self.train_params.lr_warm_steps
+            return sched(optimizer, start_factor=1.0,
+                         end_factor=self.train_params.min_lr / self.train_params.lr,
+                         total_iters=expected_main_scheduler_steps)
         else:
             raise Exception("unknown scheduler type:",
                             self.train_params.lr_scheduler_type)

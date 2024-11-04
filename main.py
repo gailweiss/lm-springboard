@@ -159,10 +159,13 @@ def train(args, lm, dataset, tp, dp, saving_folder):
         # presumably its for multi-gpu training but i haven't learned how yet
         max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
 
-    mytrainer = Trainer(lm, tp, start_time=start_time)
+    tdl = dataset.train_dataloader(tp.batch_size)
+    mytrainer = Trainer(lm, tp, 
+                        train_dataloader_nbatches=len(tdl), 
+                        start_time=start_time)
     mytrainer.prepare_saver(dp, saving_folder, save_model_)
 
-    pltrainer.fit(mytrainer, dataset.train_dataloader(tp.batch_size),
+    pltrainer.fit(mytrainer, tdl,
                   dataset.val_dataloader(tp.batch_size))
     pltrainer.validate(mytrainer,
                        dataloaders=dataset.val_dataloader(tp.batch_size))
