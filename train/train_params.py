@@ -25,7 +25,7 @@ class TrainParams:
     lora_std: float = 0.02
     checkpoint_every: int = 0
     early_stop_nsamples: int = -1
-    random_seed: None = None
+    random_seed: int = None
 
 # batch_size:
 #   The batch size used for the training and validation sets
