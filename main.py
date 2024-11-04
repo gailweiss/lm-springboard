@@ -25,6 +25,7 @@ import sys
 import numpy as np
 import random
 
+
 # not trying to parallelize the tokenizer, i tokenize everything first and then
 # load tokens (not sequences) later. (may want to change this in future, if
 # move to training on very big data)
