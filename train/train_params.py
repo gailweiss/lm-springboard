@@ -27,6 +27,13 @@ class TrainParams:
     early_stop_nsamples: int = -1
     random_seed: int = None
 
+
+def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
+            **d):
+    return apply_dataclass(TrainParams, d, forgiving=forgiving,
+                           convert_lists_to_tuples=convert_lists_to_tuples)
+    # ready for fixes over time
+
 # batch_size:
 #   The batch size used for the training and validation sets
 # accumulate_grad_batches:
