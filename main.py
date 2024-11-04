@@ -85,22 +85,19 @@ class Namer:
 
 
 def seed_everything(args_seed, tp):
-    if None is not args_seed:
-        tp.random_seed = args_seed # i.e., args_seed is stronger than config, if set
-    if None is tp.random_seed: 
-        tp.random_seed = random.randint(0,2**32 -1 )
-    seed = tp.random_seed
+    seed = args_seed
+    if None is seed:
+        seed = tp.random_seed # i.e., args_seed is stronger than config, if set
+    if None is seed: 
+        seed = random.randint(0,2**32 -1 )
 
     pl.seed_everything(seed)
-    
     torch.manual_seed(seed)
-    
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
     if torch.backends.mps.is_available():
         torch.mps.manual_seed(seed)
-
     np.random.seed(seed)
     random.seed(seed)
     
@@ -229,7 +226,8 @@ def save_model(args, saving_folder, pltrainer, dp, tp):
 
 
 def run_config(args, dp, tp, mp, namer):
-    seed = seed_everything(args.random_seed, tp)
+    tp = deepcopy(tp)
+    tp.random_seed = seed_everything(args.random_seed, tp)
     full_params = build_full(dp, tp, mp)
     run, run_name, run_loc = setup_wandb(args, tp, full_params, namer)
     saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
