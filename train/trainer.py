@@ -303,9 +303,8 @@ class Trainer(pl.LightningModule):
     def get_weight_norms(self):
         total_norm = 0
         for p in self.model.parameters():
-            if p.requires_grad:
-                param_norm = p.data.norm(2)
-                total_norm += param_norm.item() ** 2
+            param_norm = p.data.norm(2)
+            total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
         return total_norm
 
