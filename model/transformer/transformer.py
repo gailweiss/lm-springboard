@@ -29,6 +29,13 @@ class Transformer(nn.Module):
         self.layers = nn.ModuleList([make_layer() for _ in
                                      range(self.model_params.n_layers)])
 
+    def not_layernorm(self, param_name):
+        if self.model_params.layer_architecture == "torch-transformer":
+            return ".norm1." not in param_name and ".norm2." not in param_name
+        if self.model_params.layer_architecture == "custom-transformer":
+            return self.layers[0].not_layernorm(param_name)
+        return "unknown layer architecture - don't know norm names!"
+
     def causal_mask(self, length, device, target_type):
         res = nn.Transformer.generate_square_subsequent_mask(length)
         res = res.to(device=device)

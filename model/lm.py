@@ -27,6 +27,12 @@ class LM(nn.Module):
         self.ignore_index = self.tokenizer.pad_token_id
         self.celoss = nn.CrossEntropyLoss(ignore_index=self.ignore_index)
 
+    def in_main_part(self, param_name):
+        return "decoder." in param_name
+
+    def not_layernorm(self, param_name):
+        return self.decoder.not_layernorm(param_name)
+
     def device(self):
         return next(self.parameters()).device
 

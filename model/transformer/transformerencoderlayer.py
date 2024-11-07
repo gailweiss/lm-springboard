@@ -37,6 +37,9 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout_ff = Dropout(train_params.dropout)
         self.activation = activation
 
+    def not_layernorm(self, param_name):
+        return ".norm1." not in param_name and ".norm2." not in param_name
+
     def __setstate__(self, state):
         super().__setstate__(state)
         if not hasattr(self, 'activation'):

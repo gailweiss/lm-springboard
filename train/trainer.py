@@ -266,24 +266,27 @@ class Trainer(pl.LightningModule):
         optimizers, _ = self.configure_optimizers(
             existing_scheduler=self.lr_schedulers())
         self.optimizers()._optimizer = optimizers[0]
-    
+
     def get_optimizer_params(self, weight_decay):
         if weight_decay <= 0:
             return self.parameters()
         decay_params = []
         no_decay_params = []
+
         for name, param in self.model.named_parameters():
-            if not param.requires_grad:
-                continue  # Exclude frozen parameters
-            if "bias" in name or "LayerNorm.weight" in name or "LayerNorm.bias" in name:
-                no_decay_params.append(param)
-            else:
+            if self.model.in_main_part(name) and \
+               self.model.not_layernorm(name) and \
+               not name.endswith("bias"):
+                # each class uses different parameter names,
+                # best to have them self report what should be weight decayed
                 decay_params.append(param)
+            else:
+                no_decay_params.append(param)
         return [
             {'params': decay_params, 'weight_decay': weight_decay},
             {'params': no_decay_params, 'weight_decay': 0.0}
         ]
-    
+
     def configure_optimizers(self, existing_scheduler=None):
         weight_decay = self.train_params.weight_decay
 
