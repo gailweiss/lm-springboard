@@ -96,6 +96,7 @@ class Trainer(pl.LightningModule):
         self.curr_epoch += 1
         self.val_count_in_epoch = -1
         print("starting epoch:",self.curr_epoch)
+        self.logged_epoch_count_yet = False
 
     def on_train_epoch_end(self):
         # note that averaging accs will give "average batch accuracy" but not
@@ -108,6 +109,7 @@ class Trainer(pl.LightningModule):
                 self.log_stat(f"stat/train_{sn}:{t}", wary_mean(stats))
             self.curr_train_stats_by_type[sn] = {}
         self.maybe_save_checkpoint(after_train_epoch=True)
+        self.log_stat("n_epochs", self.curr_epoch)
 
     def on_validation_epoch_end(self):
         # note that averaging accs will give "average batch accuracy" but not
@@ -205,6 +207,9 @@ class Trainer(pl.LightningModule):
         self.log_stat("avg_lr", self.curr_avg_lr())
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
+        if not self.logged_epoch_count_yet:
+            self.log_stat("n_epochs", self.curr_epoch)
+            self.logged_epoch_count_yet = True
         self.log_stat("n_opt_steps", self.n_opt_steps)
         self.log_stat("weight_norms", self.get_weight_norms())
         
