@@ -273,6 +273,10 @@ class Trainer(pl.LightningModule):
         self.optimizers()._optimizer = optimizers[0]
 
     def get_optimizer_params(self, weight_decay):
+        # note: if ever add freezing into this code, will have to update
+        # code here to avoid sending frozen parameters into the optimizer:
+        # e.g. i think optimizers with weight decay will apply it even to
+        # frozen parameters
         if weight_decay <= 0:
             return self.parameters()
         decay_params = []
