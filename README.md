@@ -67,9 +67,9 @@ The model will be saved in a subfolder of `../saved-models` relative to the loca
 
 To load a model you have saved, open your terminal or a jupyter notebook, and run
 ```
-import model_explorer
+import misc.model_explorer as me
 timestamp = {timestamp}  # your timestamp here
-lm, dataset, train_stats, params = model_explorer.get_model_by_timestamp(timestamp)
+lm, dataset, train_stats, params = me.get_model_by_timestamp(timestamp)
 ```
 where `{timestamp}` is the timestamp of your saved model as it appears in its containing folder's path (see above), e.g. `timestamp = "2024-04-22--16-17-00"`. 
 
@@ -85,7 +85,7 @@ This function returns 4 values, `lm`, `dataset`, `train_stats`, and `params`.
 The last thing that `main.py` does before saving a model is check and store its validation loss. To rule out any obvious mistakes, we can make sure that the model we have loaded still obtains the same validation loss on its data as it claimed to when saved, behaves deterministically, and so on. Run 
 
 ```
-model_explorer.verify_stable_load(timestamp)
+me.verify_stable_load(timestamp)
 ``` 
 
 to do some basic checks, and see that it doesn't complain. 
@@ -97,7 +97,7 @@ Independently of wandb logging, saved models also save their recorded losses, an
 Run 
 
 ```
-model_explorer.plot_metric(train_stats,"validation_loss")
+me.plot_metric(train_stats,"validation_loss")
 ```
 
 to see the validation losses over time (measured in number of trained samples) of the model you have loaded. You can also plot any other metric in `train_stats`, you can list these by running `list(train_stats.keys())`
@@ -196,13 +196,13 @@ When applied to several sequences of different lengths, `per_token_res` is shape
 Show the attention patterns of a transformer lm using the `model_explorer` function `show_lm_attns`. This function will work with the trainable transformers in this repository, if you add non-transformer layers however, you will have to edit the relevant logic in `model/transformer/transformer.py`. 
 
 ```
-out_embeds, attns = model_explorer.show_lm_attns(lm,"as business managers know")
+out_embeds, attns = me.show_lm_attns(lm,"as business managers know")
 ```
 
 `show_lm_attns` expects as input an LM object and a single sequence, in the same possible formats that the LM accepts for a single sequence (i.e. string, list of indices, or 1D tensor). It will show the attention patterns of each head in each layer on that sequence, or subsets of the heads and layers as specified by the arguments `layers` and `heads`. It can save these as images in a folder `../attentions/{folder_name}` if the argument `folder_name` is specified:
 
 ```
-out_embeds, attns = model_explorer.show_lm_attns(lm,lm.tokenizer("as business managers know"),layers=[0],heads=[0],folder_name="demo")
+out_embeds, attns = me.show_lm_attns(lm,lm.tokenizer("as business managers know"),layers=[0],heads=[0],folder_name="demo")
 ```
 
 This function also returns `out_embeds` and `attns`, which give the model's output logits and attention patterns on this input sequence as their names imply. Their shapes are `batch size (i.e. 1) x seq len x vocab size` and `batch size (i.e. 1) x n layers x n heads x seq len (in) x seq len (out)`, respectively.

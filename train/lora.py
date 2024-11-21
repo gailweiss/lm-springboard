@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from model.transformer.transformer import Transformer
 from copy import deepcopy
 import torch.nn.utils.parametrize as parametrize
-from util import get_parent_module, get_nested_param
+from misc.util import get_parent_module, get_nested_param
 
 
 class LoRA(nn.Module):

@@ -1,8 +1,8 @@
 import json
-from util import prepare_directory
+from misc.util import prepare_directory
 from pathlib import Path
 from os.path import join as path_join
-from create import make_model, make_datamodule
+from misc.create import make_model, make_datamodule
 from train.trainer import Trainer
 from train.train_params import make_tp
 from model.model_params import make_mp
@@ -10,12 +10,12 @@ from model.tokenizer import load_stored_tokenizer_if_exists
 from data.dataloader import get_existing_datamodule
 from data.data_params import make_dp
 import glob
-from util import printer_print as print
+from misc.util import printer_print as print
 from dataclasses import asdict
 
 
 try:
-    with open("models-paths.txt", "r") as f:
+    with open("paths/models-paths.txt", "r") as f:
         models_paths = f.readlines()
         # e.g. ../saved-models, or more complicated if using cloud services
         models_paths = [l.strip("\n") for l in models_paths if not

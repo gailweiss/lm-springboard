@@ -3,10 +3,10 @@ from data.syntheticdata import SyntheticSamplesIterator
 from model.tokenizer import MyTokenizer
 from model.transformer.transformer import Transformer
 from model.lm import LM
-from gpt2 import get_gpt2
+from misc.gpt2 import get_gpt2
 import dataclasses
 from train.lora import apply_lora_to_model
-from util import get_probably_unique
+from misc.util import get_probably_unique
 from os.path import join as path_join
 
 

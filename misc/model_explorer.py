@@ -1,12 +1,13 @@
 import matplotlib.pyplot as plt
-from save_load import load_model, load_model_info, final_chkpt, models_paths
+from misc.save_load import load_model, load_model_info, final_chkpt, \
+                           models_paths
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from util import prepare_directory, glob_nosquares, pad
+from misc.util import prepare_directory, glob_nosquares, pad
 import sys
 from os.path import join as path_join
-from util import printer_print as print
+from misc.util import printer_print as print
 import json
 import itertools
 from copy import deepcopy

@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-from util import pick_index_from_distribution, timed
+from misc.util import pick_index_from_distribution, timed
 from model.embeddings import FullEmbedding
 from data.dataloader import mycollate, DataLoader
 from tqdm import tqdm
-from util import printer_print as print
+from misc.util import printer_print as print
 
 
 class LM(nn.Module):

@@ -7,4 +7,5 @@ configs/
 curr\ todo
 datamodules-paths.txt
 models-paths.txt
+paths/
 rcplist.sh

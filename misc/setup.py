@@ -1,11 +1,11 @@
 from model.transformer.transformer import Transformer
-from create import make_model
-from save_load import load_model, get_datamodule
-from model_explorer import get_full_path
+from misc.create import make_model
+from misc.save_load import load_model, get_datamodule
+from misc.model_explorer import get_full_path
 from data.data_params import make_dp
 from model.model_params import make_mp
 from train.train_params import make_tp
-from util import printer_print as print
+from misc.util import printer_print as print
 
 
 def sync_model_params(requested_model_params, loaded_model_params):

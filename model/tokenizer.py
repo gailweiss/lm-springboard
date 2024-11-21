@@ -1,11 +1,11 @@
 from data.syntheticdata import SyntheticSamplesIterator
 from transformers import BertTokenizer, GPT2Tokenizer
-from util import timed
+from misc.util import timed
 import tokenizers
 from transformers import PreTrainedTokenizerFast
 from tqdm import tqdm
 import json
-from util import printer_print as print
+from misc.util import printer_print as print
 
 
 @timed

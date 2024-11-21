@@ -9,12 +9,12 @@ import lightning as pl
 import argparse
 from dataclasses import asdict
 import wandb
-from util import get_probably_unique, print_nicely_nested, in_try, \
+from misc.util import get_probably_unique, print_nicely_nested, in_try, \
                  prepare_directory, printer, glob_nosquares
-from util import printer_print as print
-from save_load import save_model as save_model_
-from save_load import final_chkpt
-from setup import setup_model_and_data
+from misc.util import printer_print as print
+from misc.save_load import save_model as save_model_
+from misc.save_load import final_chkpt
+from misc.setup import setup_model_and_data
 import shutil
 from copy import deepcopy
 import ast

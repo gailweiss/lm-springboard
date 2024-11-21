@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from data.syntheticdata import syntheticdatasets
-from util import apply_dataclass
+from misc.util import apply_dataclass
 
 
 @dataclass

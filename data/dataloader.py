@@ -9,9 +9,9 @@ from os.path import join as path_join
 from model.tokenizer import load_stored_tokenizer_if_exists
 from model.model_params import make_mp
 import numpy as np
-from util import prepare_directory, glob_nosquares
+from misc.util import prepare_directory, glob_nosquares
 import json
-from util import printer_print as print
+from misc.util import printer_print as print
 
 
 try:
@@ -25,7 +25,7 @@ except Exception as e:
 
 
 try:
-    with open("datamodules-paths.txt", "r") as f:
+    with open("paths/datamodules-paths.txt", "r") as f:
         datamodules_paths = f.readlines()
         # e.g. ../dataloaders, or more complicated if using cloud services
         datamodules_paths = [l.strip("\n") for l in datamodules_paths if not

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from util import apply_dataclass
+from misc.util import apply_dataclass
 
 
 @dataclass
