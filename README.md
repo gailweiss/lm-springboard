@@ -20,6 +20,10 @@ Once that's done, get into your logic! In `Custom Datasets` see how to define or
 
 # Basics: Setup, and a Plain Train Run
 
+## Preparation
+
+Create a folder called `configs`, and move the contents of `example-configs` into there, for use in this tutorial.
+
 ## Requirements
 
 The full requirements list is in `requirements.txt`, which lists also the versions of the relevant packages that I happen to be using - though you will probably have success with your versions too.
