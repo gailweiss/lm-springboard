@@ -11,6 +11,7 @@ from misc.util import printer_print as print
 import json
 import itertools
 from copy import deepcopy
+from data.dataloader import datamodules_paths, LMDataModule
 
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
@@ -208,6 +209,16 @@ def checkpoint_ids(identifier):
     chkpts = [as_int(p.split("/")[-1]) for p in checkpoint_paths]
     return sorted([i for i in chkpts if isinstance(i,int)]) + \
            sorted([i for i in chkpts if not isinstance(i,int)])
+
+
+def get_datamodule_by_identifier(identifier):
+    for p in datamodules_paths:
+        paths = glob_nosquares(f"{p}/*/{identifier}")
+        if paths:
+            assert len(paths) == 1
+            path = paths[0]
+            print(path)
+            return LMDataModule(None, None, None, None, from_folder=path)
 
 
 get_model_cache = {}
