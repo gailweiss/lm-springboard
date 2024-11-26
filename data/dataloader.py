@@ -32,7 +32,7 @@ try:
                              l.startswith("#")]
 except Exception as e:
     print("couldnt find extra dataloader paths")
-    datamodules_paths = "../datamodules"
+    datamodules_paths = ["../datamodules"]
 
 
 def get_local_datafolder(n):
@@ -159,14 +159,14 @@ class LMDataModule(pl.LightningDataModule):
 
     def setup_from_folder(self, path):  
         with open(path_join(path, "model_params.json"), "r") as f:
-            self.model_params = make_mp(json.load(f), forgiving=True, 
+            self.model_params = make_mp(**json.load(f), forgiving=True, 
                 takes_extras=True)
             # allows that mp may specify some additional things not in current
             # model_params definition, if made by more specific branch. assumes
             # these additional things only add information, but do not take
             # away or modify anything needed here
         with open(path_join(path, "data_params.json"), "r") as f:
-            self.data_params = make_dp(json.load(f), forgiving=True,
+            self.data_params = make_dp(**json.load(f), forgiving=True,
                 takes_extras=True)
             # as with model_params above
         self.tokenizer = load_stored_tokenizer_if_exists(
