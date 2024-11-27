@@ -85,13 +85,16 @@ def get_existing_datamodule(data_params, model_params):
                                 "max_seq_len"]
         for a in important_data_attrs:
             if not dpd[a] == getattr(data_params, a):
+                print("mismatch on data attr:", a)
                 return False
         for a in important_model_attrs:
             if not mpd[a] == getattr(model_params, a):
+                print("mismatch on model attr:", a)
                 return False
         if model_params.tokenizer_source_name == "custom":
             if not (mpd["custom_tokenizer_ntokens"] == 
                     model_params.custom_tokenizer_ntokens):
+                print("mismatch on number of tokens")
                 return False
         return True
 
@@ -345,9 +348,9 @@ class LMDataModule(pl.LightningDataModule):
         print(f"sample {i}, has {n} tokens:")
         print(self.get_sample_str(i))
 
-    def train_dataloader(self, batch_size):
+    def train_dataloader(self, batch_size, shuffle=True):
         return self.generic_loader(self.train_samples, batch_size,
-                                   shuffle=True)
+                                   shuffle=shuffle)
 
     def val_dataloader(self, batch_size):
         return self.generic_loader(self.val_samples, batch_size)
