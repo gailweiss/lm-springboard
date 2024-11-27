@@ -12,7 +12,7 @@ lr = 3e-4
 max_sample_tokens = 20
 lr_warm_steps = 100
 lr_cycle_steps = 500
-val_check_epoch_frac = 0.1
+val_check_epoch_frac = 0.25
 
 ModelParams
 
