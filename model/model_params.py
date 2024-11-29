@@ -17,7 +17,8 @@ class ModelParams:
     individual_head_params: bool = False
     pos_encoding: str = "learned"
 
-def make_mp(forgiving=False, takes_extras=False,  convert_lists_to_tuples=False,
+
+def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
             **d):
     return apply_dataclass(ModelParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples)
@@ -90,8 +91,7 @@ def make_mp(forgiving=False, takes_extras=False,  convert_lists_to_tuples=False,
 #   max_seq_len, all arguments describing the model architecture are
 #   overwritten to describe the saved model (for max_seq_len, get minimum
 #   between given max_seq_len and model max_seq_len). Supersedes from_saved.
-#   Describes saved_model as identifier for identifier in
-#   model_explorer, 
+#   Describes saved_model as identifier for identifier in model_explorer,
 #   e.g. from_saved = "2024-01-01--00-00-00" or "2024-01-01--00-00-00---1234".
 # individual_head_params:
 #   Implementation setting: how to store the parameters of each head in each

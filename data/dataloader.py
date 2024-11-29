@@ -28,8 +28,8 @@ try:
     with open("paths/datamodules-paths.txt", "r") as f:
         datamodules_paths = f.readlines()
         # e.g. ../dataloaders, or more complicated if using cloud services
-        datamodules_paths = [l.strip("\n") for l in datamodules_paths if not
-                             l.startswith("#")]
+        datamodules_paths = [p.strip("\n") for p in datamodules_paths if not
+                             p.startswith("#")]
 except Exception as e:
     print("couldnt find extra dataloader paths")
     datamodules_paths = ["../datamodules"]
@@ -62,11 +62,13 @@ def get_data(data_params):
         raise Exception(f"unknown dataset: {data_params.dataset_name}")
     if data_params.debug_crop:
         data_params.debug_crop = int(data_params.debug_crop)
+
         def apply_crop(it):
             if isinstance(it, SyntheticSamplesIterator):
                 return it.cropped(data_params.debug_crop)
             else:
                 return it[:data_params.debug_crop]
+
         if isinstance(samples, list) or \
            isinstance(samples, SyntheticSamplesIterator):
             samples = apply_crop(samples)
@@ -79,9 +81,9 @@ def get_existing_datamodule(data_params, model_params):
     def is_match(dpd, mpd):
         # all the attrs that determine the dataset and the tokenizer
         important_model_attrs = ["max_seq_len", "tokenizer_source_name"]
-        important_data_attrs = ["dataset_name", "debug_crop", 
+        important_data_attrs = ["dataset_name", "debug_crop",
                                 "breaking_synthetic_samples_ok",
-                                "val_pct", "test_pct", "lines_per_sample", 
+                                "val_pct", "test_pct", "lines_per_sample",
                                 "max_seq_len"]
         for a in important_data_attrs:
             if not dpd[a] == getattr(data_params, a):
@@ -92,7 +94,7 @@ def get_existing_datamodule(data_params, model_params):
                 print("mismatch on model attr:", a)
                 return False
         if model_params.tokenizer_source_name == "custom":
-            if not (mpd["custom_tokenizer_ntokens"] == 
+            if not (mpd["custom_tokenizer_ntokens"] ==
                     model_params.custom_tokenizer_ntokens):
                 print("mismatch on number of tokens")
                 return False
@@ -151,8 +153,9 @@ class LMDataModule(pl.LightningDataModule):
                 self.setup_from_data_dict(data)
             self.prep_for_torch_datasets()
         self.data_params.total_train_samples = len(self.train_samples)
-        self.data_params.total_samples = sum([len(ds) for ds in \
-            [self.train_samples, self.val_samples, self.test_samples]])
+        self.data_params.total_samples = \
+            sum([len(ds) for ds in [self.train_samples, self.val_samples,
+                                    self.test_samples]])
 
     def set_max_seq_len(self):
         self.max_seq_len = self.model_params.max_seq_len
@@ -160,21 +163,21 @@ class LMDataModule(pl.LightningDataModule):
             self.max_seq_len = min(self.max_seq_len,
                                    self.data_params.max_seq_len)
 
-    def setup_from_folder(self, path):  
+    def setup_from_folder(self, path):
         with open(path_join(path, "model_params.json"), "r") as f:
-            self.model_params = make_mp(**json.load(f), forgiving=True, 
-                takes_extras=True)
+            self.model_params = make_mp(**json.load(f), forgiving=True,
+                                        takes_extras=True)
             # allows that mp may specify some additional things not in current
             # model_params definition, if made by more specific branch. assumes
             # these additional things only add information, but do not take
             # away or modify anything needed here
         with open(path_join(path, "data_params.json"), "r") as f:
             self.data_params = make_dp(**json.load(f), forgiving=True,
-                takes_extras=True)
+                                       takes_extras=True)
             # as with model_params above
         self.tokenizer = load_stored_tokenizer_if_exists(
             self.model_params.tokenizer_source_name, path, self.verbose_init)
-        assert None is not self.tokenizer  
+        assert None is not self.tokenizer
         # can't be loading tokenized data without its tokenizer
         self.set_max_seq_len()
 
@@ -207,7 +210,7 @@ class LMDataModule(pl.LightningDataModule):
         # save tokenizer, save self
         self.tokenizer.save(path)
         base_attr_names = ["train_n", "test_n", "val_n"]
-        base_attrs = {n: getattr(self,n) for n in base_attr_names}
+        base_attrs = {n: getattr(self, n) for n in base_attr_names}
         with open(path_join(path, f"dataloader_notes.json"), "w") as f:
             json.dump(base_attrs, f)
         with open(path_join(path, f"model_params.json"), "w") as f:
@@ -218,7 +221,7 @@ class LMDataModule(pl.LightningDataModule):
         for sn in ["train_samples", "test_samples", "val_samples"]:
             ds = getattr(self, sn)
             for a in ["lengths", "indices"]:
-                np.save(path_join(path, f"{sn}-{a}.npy"), getattr(ds, a), 
+                np.save(path_join(path, f"{sn}-{a}.npy"), getattr(ds, a),
                         allow_pickle=False)
 
     def setup_from_data_dict(self, samples):
@@ -278,9 +281,10 @@ class LMDataModule(pl.LightningDataModule):
 
         if None is not overall_list:
             print(descstr(overall_list, "overall data"))
-        
-        named_lists = [(self.train_samples, "train"), (self.val_samples, "val"),
-                        (self.test_samples, "test")]
+
+        named_lists = [(self.train_samples, "train"),
+                       (self.val_samples, "val"),
+                       (self.test_samples, "test")]
         for lst, n in named_lists:
             print("\t", descstr(lst, n))
 

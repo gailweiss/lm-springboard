@@ -7,7 +7,7 @@ from misc.util import printer_print as print
 
 class Trainer(pl.LightningModule):
     def __init__(self, model, train_params, start_time=None,
-                 samples_at_validation=True, 
+                 samples_at_validation=True,
                  train_dataloader_nbatches=None):
         super().__init__()
         self.model = model
@@ -40,7 +40,6 @@ class Trainer(pl.LightningModule):
         self.log_stat("n_train_samples", self.n_train_samples)
         self.log_stat("n_train_batches", self.n_train_batches)
         self.log_stat("n_opt_steps", self.n_opt_steps)
-        
 
     def prepare_saver(self, dp, saving_folder, saving_function):
         self.dp = dp
@@ -95,7 +94,7 @@ class Trainer(pl.LightningModule):
     def on_train_epoch_start(self):
         self.curr_epoch += 1
         self.val_count_in_epoch = -1
-        print("starting epoch:",self.curr_epoch)
+        print("starting epoch:", self.curr_epoch)
         self.logged_epoch_count_yet = False
 
     def on_train_epoch_end(self):
@@ -161,7 +160,8 @@ class Trainer(pl.LightningModule):
                 recording_dict[t].append(item(stats[t]))
         if from_train:
             for t in stats:
-                self.log_stat(f"stat/train_batch_{stat_name}:{t}", item(stats[t]))
+                self.log_stat(f"stat/train_batch_{stat_name}:{t}",
+                              item(stats[t]))
 
     def curr_avg_lr(self):
         lrs = [pg['lr'] for pg in self.lr_schedulers().optimizer.param_groups]
@@ -181,8 +181,8 @@ class Trainer(pl.LightningModule):
     def on_train_batch_start(self, batch, batch_idx):
         if self.train_params.early_stop_nsamples > 0:
             if self.n_train_samples >= self.train_params.early_stop_nsamples:
-                return -1  # will stop the training, according to pytorch 
-                           # lightning
+                return -1
+                # will stop the training, according to pytorch lightning
 
     def training_step(self, batch, batch_idx):
         self.stat_syncer += 1
@@ -212,7 +212,7 @@ class Trainer(pl.LightningModule):
             self.logged_epoch_count_yet = True
         self.log_stat("n_opt_steps", self.n_opt_steps)
         self.log_stat("weight_norms", self.get_weight_norms())
-        
+
         self.manual_backward(losses["main"])
         self.maybe_step_opt_and_lr(batch_idx)
 
@@ -257,11 +257,12 @@ class Trainer(pl.LightningModule):
         elif self.train_params.lr_scheduler_type == 'Linear':
             sched = torch.optim.lr_scheduler.LinearLR
             expected_main_scheduler_steps = (
-                (self.train_params.epochs * self.train_dataloader_nbatches) // 
+                (self.train_params.epochs * self.train_dataloader_nbatches) //
                 self.train_params.accumulate_grad_batches
             ) - self.train_params.lr_warm_steps
+            end_factor = self.train_params.min_lr / self.train_params.lr
             return sched(optimizer, start_factor=1.0,
-                         end_factor=self.train_params.min_lr / self.train_params.lr,
+                         end_factor=end_factor,
                          total_iters=expected_main_scheduler_steps)
         else:
             raise Exception("unknown scheduler type:",
@@ -320,7 +321,6 @@ class Trainer(pl.LightningModule):
 
         return [optimizer], [s_main]
 
-
     def get_weight_norms(self):
         total_norm = 0
         for p in self.model.parameters():
@@ -370,6 +370,7 @@ def clear_gpu_caches():
         torch.cuda.empty_cache()
     if hasattr(torch, "mps") and torch.backends.mps.is_available():
         torch.mps.empty_cache()
+
 
 def wary_mean(vals):
     vals = [v for v in vals if None is not v]

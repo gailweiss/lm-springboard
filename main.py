@@ -45,7 +45,8 @@ parser.add_argument('--gpu-id', type=int, default=None)
 # for internal debug use (can be passed to get_exception at the bottom here):
 parser.add_argument('--return-things', type=bool, default=False)
 parser.add_argument('--keep-datamodule', action='store_true')
-parser.add_argument('--random_seed', type=int, default=None, help='Random seed for reproducibility')
+parser.add_argument('--random_seed', type=int, default=None,
+                    help='Random seed for reproducibility')
 
 
 MAIN_PROJ = "base"  # project name for wandb runs
@@ -88,9 +89,9 @@ class Namer:
 def seed_everything(args_seed, tp):
     seed = args_seed
     if None is seed:
-        seed = tp.random_seed # i.e., args_seed is stronger than config, if set
-    if None is seed: 
-        seed = random.randint(0,2**32 -1 )
+        seed = tp.random_seed  # i.e. args_seed is stronger than config, if set
+    if None is seed:
+        seed = random.randint(0, 2 ** 32 - 1)
 
     pl.seed_everything(seed)
     torch.manual_seed(seed)
@@ -101,10 +102,10 @@ def seed_everything(args_seed, tp):
         torch.mps.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    
+
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    
+
     return seed
 
 
@@ -161,8 +162,8 @@ def train(args, lm, dataset, tp, dp, saving_folder):
         max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
 
     tdl = dataset.train_dataloader(tp.batch_size)
-    mytrainer = Trainer(lm, tp, 
-                        train_dataloader_nbatches=len(tdl), 
+    mytrainer = Trainer(lm, tp,
+                        train_dataloader_nbatches=len(tdl),
                         start_time=start_time)
     mytrainer.prepare_saver(dp, saving_folder, save_model_)
 
@@ -212,7 +213,7 @@ def finish_wandb(args, tp, run, run_loc):
             shutil.rmtree(run_loc)
         except Exception as e:
             print("couldnt delete wandb log at:", run_loc,
-                " -- got exception:\n", e)
+                  " -- got exception:\n", e)
 
 
 def show_sample(lm):
@@ -246,11 +247,11 @@ def run_config(args, dp, tp, mp, namer):
         printer.add_output_file(f)
 
     print("going to train from config: [", args.config,
-                  "], using the following parameters:")
+          "], using the following parameters:")
     print_nicely_nested(full_params)
-    lm, dataset = setup_model_and_data(dp, mp, tp, 
-                                      keep_datamodule=args.keep_datamodule)
-    
+    lm, dataset = setup_model_and_data(dp, mp, tp,
+                                       keep_datamodule=args.keep_datamodule)
+
     pltrainer = train(args, lm, dataset, tp, dp, saving_folder)
     show_sample(pltrainer.model.model)
     save_model(args, saving_folder, pltrainer, dp, tp)

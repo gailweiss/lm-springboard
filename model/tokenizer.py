@@ -64,7 +64,9 @@ class CharTokenizer:
 
     def make_tokens(self, data):
         tokens = set()
-        assert isinstance(data, list) or isinstance(data, SyntheticSamplesIterator)
+        expected_format = isinstance(data, list) or \
+            isinstance(data, SyntheticSamplesIterator)
+        assert expected_format
         for s in data:
             tokens.update(list(s))
         tokens.update(self.special_tokens)

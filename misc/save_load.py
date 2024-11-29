@@ -18,10 +18,10 @@ try:
     with open("paths/models-paths.txt", "r") as f:
         models_paths = f.readlines()
         # e.g. ../saved-models, or more complicated if using cloud services
-        models_paths = [l.strip("\n") for l in models_paths if not
-                             l.startswith("#")]
-        # models will be saved specifically in the first path in this file. 
-        # however, model_explorer.py will use *all* of the paths listed in 
+        models_paths = [p.strip("\n") for p in models_paths if not
+                        p.startswith("#")]
+        # models will be saved specifically in the first path in this file.
+        # however, model_explorer.py will use *all* of the paths listed in
         # this file to find models.
 
 except Exception as e:
@@ -61,21 +61,20 @@ def load_model_info(folder_name, with_train_stats=False):
         res["params"]["data_params"] = make_dp(**json.load(f))
     with open(path_join(folder_name, "train_params.json"), "r") as f:
         res["params"]["train_params"] = make_tp(**json.load(f))
-    
+
     for pn, pd in res["params"].items():
         for k, v in asdict(pd).items():
-            if isinstance(v, list): 
+            if isinstance(v, list):
                 # json turns tuples into lists, but saved configs (i.e.
                 # true configs, not config 'lists') don't have lists: correct
                 setattr(pd, k, tuple(v))
-
 
     if with_train_stats:
         with open(path_join(folder_name, "train_stats.json"), "r") as f:
             res["train_stats"] = json.load(f)
             res["train_stats"]["total_train_samples"] = \
-                res["train_stats"].get("n_train_samples",[[0]])[-1][0]
-                # if not got, this is the model at time 0 (no training yet)
+                res["train_stats"].get("n_train_samples", [[0]])[-1][0]
+            # if not got, this is the model at time 0 (no training yet)
 
     return res
 
@@ -107,7 +106,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
     # tokenizer for model
     if with_data:
         res["dataset"] = get_datamodule(res["params"]["data_params"],
-                                        res["params"]["model_params"], 
+                                        res["params"]["model_params"],
                                         verbose=verbose,
                                         keep_datamodule=keep_datamodule)
         tokenizer = res["dataset"].tokenizer
@@ -116,7 +115,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
         tokenizer = load_stored_tokenizer_if_exists(
             res["params"]["model_params"].tokenizer_source_name, folder_name,
             verbose)
-    
+
     # todo: if this happens to be a gpt2 based model, then its fine not to have
     # any stored info on the tokenizer, can load the appropriate one from hf
     # instead. for now not an issue though
@@ -125,8 +124,8 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
 
     # prepare model to be filled with saved parameters
 
-    lm = make_model(res["params"]["model_params"], 
-                    res["params"]["train_params"], 
+    lm = make_model(res["params"]["model_params"],
+                    res["params"]["train_params"],
                     tokenizer)
 
     # fill model with saved params. don't know if this will affect the

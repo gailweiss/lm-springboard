@@ -38,7 +38,7 @@ class Printer:
 
     def print(self, *args, **kwargs):
         print_files = self.other_files
-        print_files = print_files + [kwargs.get("file", sys.stdout)] 
+        print_files = print_files + [kwargs.get("file", sys.stdout)]
         print_files = set(print_files)  # in case of duplicates
         kwargs = {n: v for n, v in kwargs.items() if not n == "file"}
         for f in print_files:
@@ -72,7 +72,8 @@ def in_try(f):
         try:
             return f(*a, **kw)
         except Exception as e:
-            printer_print(f"\n\n\n!!!!!!\n" +
+            printer_print(
+                f"\n\n\n!!!!!!\n" +
                 f"running {f.__name__} hit exception:\n {e}\n\n" +
                 "!!!!!!!!!!!!!\n\n\n")
             return e
@@ -81,7 +82,7 @@ def in_try(f):
 
 def pad(s, width=5, place="center"):
     s = str(s)
-    total = width - len(s)    
+    total = width - len(s)
     if place == "left":
         return s + (" " * total)
     if place == "right":
@@ -235,16 +236,17 @@ def glob_nosquares(p, **kw):
     # but can turn each [ and ] into the range containing only [ or ], i.e.
     # [[] and []]. use § as mediator in replace operation to avoid unwanted
     # applications in second replace
-    p = p.replace("[","§[§").replace("]","§]§")
-    p = p.replace("§[§","[[]").replace("§]§","[]]")
+    p = p.replace("[", "§[§").replace("]", "§]§")
+    p = p.replace("§[§", "[[]").replace("§]§", "[]]")
     return glob.glob(p, **kw)
 
 
-def apply_dataclass(dataclass, given_attrs, forgiving=False, 
-    takes_extras=False, convert_lists_to_tuples=True, name_changes=None):
+def apply_dataclass(dataclass, given_attrs, forgiving=False,
+                    takes_extras=False, convert_lists_to_tuples=True,
+                    name_changes=None):
 
     if convert_lists_to_tuples:
-        given_attrs = {n: tuple(v) if isinstance(v, list) else v for \
+        given_attrs = {n: tuple(v) if isinstance(v, list) else v for
                        n, v in given_attrs.items()}
     if name_changes:
         for old_name, new_name in name_changes:
