@@ -1,5 +1,6 @@
 import json
 from misc.util import prepare_directory
+from misc.gpt2 import get_gpt2
 from pathlib import Path
 from os.path import join as path_join
 from misc.create import make_model, make_datamodule
@@ -102,39 +103,50 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
     # - or it will try (unsuccessfully) to send validation losses to wandb when
     # doing a validation run
 
+    # if working from a pretrained model, get model and tokenizer directly
+    if res["params"]["model_params"].from_os_pretrained:
+        if res["params"]["model_params"].from_os_pretrained == "gpt2":
+            res["lm"] = get_gpt2()
+        else:
+            e = NotImplementedError(
+                "unknown pretrained model requested:" +
+                f"{model_params.from_os_pretrained}")
+            raise e
+        tokenizer = res["lm"].tokenizer
+    else:
+        tokenizer = None  # will find soon, but not known yet
+
     # get tokenizer, through dataset if asked to get data, else seek stored
     # tokenizer for model
     if with_data:
         res["dataset"] = get_datamodule(res["params"]["data_params"],
                                         res["params"]["model_params"],
                                         verbose=verbose,
-                                        keep_datamodule=keep_datamodule)
+                                        keep_datamodule=keep_datamodule,
+                                        given_tokenizer=tokenizer)
         tokenizer = res["dataset"].tokenizer
     else:
         res["dataset"] = None
-        tokenizer = load_stored_tokenizer_if_exists(
-            res["params"]["model_params"].tokenizer_source_name, folder_name,
-            verbose)
-
-    # todo: if this happens to be a gpt2 based model, then its fine not to have
-    # any stored info on the tokenizer, can load the appropriate one from hf
-    # instead. for now not an issue though
+        if None is tokenizer:
+            tokenizer = load_stored_tokenizer_if_exists(
+                res["params"]["model_params"].tokenizer_source_name,
+                folder_name, verbose)
 
     assert None is not tokenizer, "no data, and didnt find saved tokenizer"
 
     # prepare model to be filled with saved parameters
-
-    lm = make_model(res["params"]["model_params"],
-                    res["params"]["train_params"],
-                    tokenizer)
+    if "lm" not in res:
+        res["lm"] = make_model(res["params"]["model_params"],
+                               res["params"]["train_params"],
+                               tokenizer)
 
     # fill model with saved params. don't know if this will affect the
     # passed in parameter lm, so will get it explicitly back from the trainer
     model_trainer = Trainer.load_from_checkpoint(
-        path_join(folder_name, "model.model"), model=lm,
+        path_join(folder_name, "model.model"), model=res["lm"],
         train_params=res["params"]["train_params"])
 
-    res["lm"] = model_trainer.model
+    res["lm"] = model_trainer.model  # in case it makes a copy or something
     res["lm"].eval()
 
     return res
