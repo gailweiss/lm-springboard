@@ -11,7 +11,7 @@ from os.path import join as path_join
 
 
 def make_datamodule(data_params, model_params, verbose=True,
-                    keep_datamodule=False):
+                    keep_datamodule=False, given_tokenizer=None):
     # the data makes the tokenizer, with both needed for the data module
 
     # 1. need the dataset as it may influence the tokenizer, e.g. if
@@ -32,11 +32,13 @@ def make_datamodule(data_params, model_params, verbose=True,
             return d
 
     # 2. make base tokenizer
-    custom_tokenizer_ntokens = model_params.custom_tokenizer_ntokens
-    tokenizer = MyTokenizer(remove_type_markers(as_iterable(plain_data)),
-                            name=model_params.tokenizer_source_name,
-                            custom_vocab_size=custom_tokenizer_ntokens,
-                            verbose_init=verbose)
+    tokenizer = given_tokenizer
+    if None is tokenizer:
+        custom_tokenizer_ntokens = model_params.custom_tokenizer_ntokens
+        tokenizer = MyTokenizer(remove_type_markers(as_iterable(plain_data)),
+                                name=model_params.tokenizer_source_name,
+                                custom_vocab_size=custom_tokenizer_ntokens,
+                                verbose_init=verbose)
 
     # 3. make a data module, with the tokenizer.
     # this one does take the true data, to maintain the train/val/test split

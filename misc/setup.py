@@ -6,6 +6,7 @@ from data.data_params import make_dp
 from model.model_params import make_mp
 from train.train_params import make_tp
 from misc.util import printer_print as print
+from misc.gpt2 import get_gpt2
 
 
 def sync_model_params(requested_model_params, loaded_model_params):
@@ -45,9 +46,12 @@ def setup_model_and_data(data_params, model_params, train_params, verbose=True,
         sync_model_params(model_params, lm.model_params)
 
     if (None is dataset) and not skip_data:
+        # in event that loading an open source pretrained model (eg gpt2), will
+        # already have a tokenizer, but not a dataset
+        given_tokenizer = load_res["lm"].tokenizer if loading else None
         # model params already been synced, can use them for the datamodule
         dataset = get_datamodule(data_params, model_params, verbose=verbose,
-            keep_datamodule=keep_datamodule)
+            keep_datamodule=keep_datamodule, given_tokenizer=given_tokenizer)
         
     if not loading:  # ie, making
         assert not skip_data  # need data to determine the tokenizer

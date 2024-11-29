@@ -10,6 +10,13 @@ def get_gpt2():
     # just some gpt2 poking. nice to have this in the base repository too
     model_params = make_mp()
     gpt2 = AutoModelForCausalLM.from_pretrained("gpt2")
+    def not_layernorm(param_name):
+        huggingface_gpt2_layernorm_names = ["ln_1", "ln_2", "ln_f"]
+        for layernorm_name in huggingface_gpt2_layernorm_names:
+            if layernorm_name in param_name:
+                return False
+        return True
+    gpt2.not_layernorm = not_layernorm
 
     # my code uses these
     model_params.from_os_pretrained = "gpt2"

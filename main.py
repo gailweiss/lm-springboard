@@ -148,6 +148,7 @@ def get_params(config_filename):
 
 def train(args, lm, dataset, tp, dp, saving_folder):
     # dp and saving_folder are for saving checkpoints
+    assert lm.tokenizer is dataset.tokenizer, "mismatched tokenizers"
     tokenizer = lm.tokenizer
     start_time = process_time()
     pltrainer = pl.Trainer(
@@ -164,6 +165,9 @@ def train(args, lm, dataset, tp, dp, saving_folder):
                         train_dataloader_nbatches=len(tdl), 
                         start_time=start_time)
     mytrainer.prepare_saver(dp, saving_folder, save_model_)
+
+    i_str = dataset.get_sample_str(0)
+    print(f"example sample from overall dataset:\n{i_str}")
 
     pltrainer.fit(mytrainer, tdl,
                   dataset.val_dataloader(tp.batch_size))

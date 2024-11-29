@@ -81,13 +81,14 @@ def load_model_info(folder_name, with_train_stats=False):
 
 
 def get_datamodule(data_params, model_params, verbose=True,
-                   keep_datamodule=False):
+                   keep_datamodule=False, given_tokenizer=None):
     data = get_existing_datamodule(data_params, model_params)
     if None is not data:
         return data
 
-    return make_datamodule(data_params, model_params,
-                           verbose=verbose, keep_datamodule=keep_datamodule)
+    return make_datamodule(data_params, model_params, verbose=verbose,
+                           keep_datamodule=keep_datamodule,
+                           given_tokenizer=given_tokenizer)
 
 
 def load_model(folder_name, full=False, verbose=True, with_data=False,
