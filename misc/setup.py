@@ -38,8 +38,10 @@ def setup_model_and_data(data_params, model_params, train_params, verbose=True,
             dataset = load_res["dataset"]
         else:
             if model_params.from_os_pretrained == "gpt2":
-                load_res["lm"] = get_gpt2()
-            else:
+                load_res["lm"] = get_gpt2(
+                    cap_max_seq_len=model_params.max_seq_len)
+                mp = load_res["lm"].model_params
+                            else:
                 e = NotImplementedError(
                     "unknown pretrained model requested:" +
                     f"{model_params.from_os_pretrained}")

@@ -106,7 +106,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
     # if working from a pretrained model, get model and tokenizer directly
     if res["params"]["model_params"].from_os_pretrained:
         if res["params"]["model_params"].from_os_pretrained == "gpt2":
-            res["lm"] = get_gpt2()
+            res["lm"] = get_gpt2(res["params"]["model_params"].max_seq_len)
         else:
             e = NotImplementedError(
                 "unknown pretrained model requested:" +

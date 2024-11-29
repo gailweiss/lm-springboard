@@ -4,7 +4,7 @@ from transformers import AutoModelForCausalLM
 from model.lm import LM
 
 
-def get_gpt2():
+def get_gpt2(cap_max_seq_len=-1):
     # sometimes i just want to look around it,
     # nothing to do with all the training stuff i have -
     # just some gpt2 poking. nice to have this in the base repository too
@@ -23,6 +23,10 @@ def get_gpt2():
     model_params.from_os_pretrained = "gpt2"
     model_params.max_seq_len = gpt2.transformer.wpe.weight.shape[0]
     model_params.layer_architecture = "gpt2-transformer"
+
+    if cap_max_seq_len > 0:
+        model_params.max_seq_len = min(model_params.max_seq_len,
+                                       cap_max_seq_len)
 
     # noting other attributes in model_params for completeness and potential
     # future use
