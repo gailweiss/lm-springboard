@@ -164,6 +164,7 @@ class LMDataModule(pl.LightningDataModule):
                                    self.data_params.max_seq_len)
 
     def setup_from_folder(self, path):
+        self.from_path = path
         with open(path_join(path, "model_params.json"), "r") as f:
             self.model_params = make_mp(**json.load(f), forgiving=True,
                                         takes_extras=True)
