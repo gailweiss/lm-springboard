@@ -335,6 +335,7 @@ class LMDataModule(pl.LightningDataModule):
         # - epochs do). i dont need this
 
     def get_sample(self, i):
+        orig_i = i
         datasets = [self.train_samples, self.val_samples, self.test_samples]
         for ds in datasets:
             if i < len(ds):
@@ -342,7 +343,7 @@ class LMDataModule(pl.LightningDataModule):
                 return n, indices[:n]
             i -= len(ds)
         n = sum([len(ds) for ds in datasets])
-        raise Exception(f"no sample at index {i}, only have {n} samples")
+        raise Exception(f"no sample at index {orig_i}, only have {n} samples")
 
     def get_sample_str(self, i=0):
         n, indices = self.get_sample(i)
