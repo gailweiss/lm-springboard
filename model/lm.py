@@ -163,7 +163,8 @@ class LM(nn.Module):
         return res, x.shape[0]  # num samples
 
     def batch_perplexities(self, batch, before_exp=False):
-        x, y, z = self.get_batch_xyz(batch)
+        with torch.no_grad():
+            x, y, z = self.get_batch_xyz(batch)
         z = z.detach()
         loss_fn = nn.CrossEntropyLoss(reduction="none",
                                       ignore_index=self.ignore_index)
