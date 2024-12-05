@@ -4,6 +4,15 @@ from transformers import AutoModelForCausalLM
 from model.lm import LM
 
 
+#### notes ####
+# 1. gpt2 was not trained with a BOS token at each sequence, see:
+#    https://github.com/huggingface/transformers/issues/3311 . 
+#    If using this to fine tune, then can arbitrarily decide that finetuned
+#    task does start with BOS, but if using this to evaluate its perplexities
+#    on new samples, then whether this BOS should be added or not depends
+#    on whether my samples are aligned with actual starts of new sequences
+
+
 def get_gpt2(cap_max_seq_len=-1):
     # sometimes i just want to look around it,
     # nothing to do with all the training stuff i have -
