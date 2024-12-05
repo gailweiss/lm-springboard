@@ -26,6 +26,9 @@ class LM(nn.Module):
         self.tested_manual_forward = False
         self.ignore_index = self.tokenizer.pad_token_id
         self.celoss = nn.CrossEntropyLoss(ignore_index=self.ignore_index)
+        self.ordered_tokens = \
+            list(self.tokenizer.convert_ids_to_nice_string(i) for i in
+                 range(self.tokenizer.vocab_size()))
 
     def in_main_part(self, param_name):
         return "decoder." in param_name
@@ -52,12 +55,32 @@ class LM(nn.Module):
             if indices[-1] == eos:
                 return True
         while not stop(indices):
-            e = self([indices])["logits"]  # batch size X seq len X vocab size
+            with torch.no_grad():
+                e = self([indices])["logits"]  # batch size X seq len X vocab size
             next_t = choose_output_index(e[0, -1, :], temperature=temperature,
                                          top_k=top_k, nucleus=nucleus)
             indices.append(next_t)
 
         return indices
+
+    def next_token_distribution(self, pref=""):
+        if isinstance(pref, str):
+            indices = self.tokenizer.tokenize_without_stop(pref)
+        else:
+            indices = pref
+        print("using indices:", indices)
+        with torch.no_grad():
+            e = self([indices])["logits"]  # batch size X seq len X vocab size
+        assert e.shape[0] == 1
+        # only want to handle one sequence so can zip with vocab nicely
+        e = e[0, -1]  # first sequence, last token - vocab size
+        
+        s = nn.Softmax(dim=-1)(e).tolist()
+
+        pairs = list(zip(s, self.ordered_tokens))
+        t2prob = {t:p for p, t in pairs}
+        sorted_probs = sorted(pairs, key=lambda x: x[0], reverse=True)
+        return {"sorted_probs": sorted_probs, "probs_dict": t2prob}
 
     @timed
     def sample(self, pref="", max_seq_len=100, temperature=1, as_str=True,
