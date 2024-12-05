@@ -13,7 +13,8 @@ class LM(nn.Module):
         self.model_params = model_params
         self.decoder = model
         self.n_tokens = tokenizer.vocab_size()
-        if self.model_params.from_os_pretrained == "gpt2":
+        if True in [n in self.model_params.from_os_pretrained for 
+                    n in ["gpt2", "pythia"]]:
             self.embed = None
             self.de_embedder = None
         else:
@@ -240,7 +241,8 @@ class LM(nn.Module):
                                      attn_requests=attn_requests,
                                      embeddings_list=embeddings_list)
             logits = self.de_embedder(eL)
-        elif self.model_params.from_os_pretrained == "gpt2":
+        elif True in [n in self.model_params.from_os_pretrained \
+                      for n in ["gpt2", "pythia"]]:
             r = self.decoder(x, output_attentions=get_attns,
                              output_hidden_states=get_embeddings)
             logits = r.logits

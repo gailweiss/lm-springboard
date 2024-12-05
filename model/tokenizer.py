@@ -1,5 +1,6 @@
 from data.syntheticdata import SyntheticSamplesIterator
-from transformers import BertTokenizer, GPT2Tokenizer
+from transformers import BertTokenizer, GPT2Tokenizer, AutoTokenizer, \
+                         GPTNeoXTokenizerFast
 from misc.util import timed
 import tokenizers
 from transformers import PreTrainedTokenizerFast
@@ -109,9 +110,14 @@ class CharTokenizer:
 
 class BertTokenizerLike:
     def __init__(self, data=None, custom_vocab_size=30,
-                 from_path=None, from_gpt2tokenizer=None, verbose_init=False):
+                 from_path=None, from_gpt2tokenizer=None,
+                 from_gptneoxtokenizer=None, verbose_init=False):
         if from_gpt2tokenizer:
             self.internal = from_gpt2tokenizer
+            self._pad_token_type_id = self.internal._pad_token_type_id
+            self.unk_token_id = self.internal.unk_token_id
+        elif from_gptneoxtokenizer:
+            self.internal = from_gptneoxtokenizer
             self._pad_token_type_id = self.internal._pad_token_type_id
             self.unk_token_id = self.internal.unk_token_id
         else:
@@ -133,7 +139,8 @@ class BertTokenizerLike:
                 res = self.internal.encode(s).ids
             else:  # PreTrainedTokenizerFast
                 res = self.internal(s)['input_ids']
-            if isinstance(self.internal, GPT2Tokenizer):
+            if isinstance(self.internal, GPT2Tokenizer) or \
+               isinstance(self.internal, GPTNeoXTokenizerFast):
                 res = [self.internal.bos_token_id] + res + \
                       [self.internal.eos_token_id]
             return res
@@ -169,6 +176,15 @@ def getBertLikeTokenizer(name, data=None, custom_vocab_size=30,
         gpt2tok = GPT2Tokenizer.from_pretrained(name)
         return BertTokenizerLike(from_gpt2tokenizer=gpt2tok,
                                  verbose_init=verbose_init)
+    if "pythia" in name:
+        stepstr = name.split("/")[-1]
+        loadstr = name[:-(1 + len(stepstr))]
+        print("getting model using:",loadstr,"and",stepstr)
+        # pythia model name format: 
+        # "EleutherAI/pythia-{size_str}" + optional "-deduped" + "/{stepstr}"
+        pythiatok = AutoTokenizer.from_pretrained(loadstr, revision=stepstr)
+        return BertTokenizerLike(from_gptneoxtokenizer=pythiatok,
+                                 verbose_init=verbose_init)
     if "bert" in name:
         res = BertTokenizer.from_pretrained(name)
         res.add_tokens(["\n"])  # i prefer the tokenizer to have this
@@ -187,7 +203,8 @@ class MyTokenizer:
         else:
             self.no_crop = no_crop
             self.name = name
-            self.is_from_HF = True in [n in name for n in ["gpt2", "bert"]]
+            self.is_from_HF = True in [n in name for n in 
+                                       ["gpt2", "bert", "pythia"]]
             self.tokenizer = getBertLikeTokenizer(
                 name, data=data, custom_vocab_size=custom_vocab_size,
                 verbose_init=verbose_init)
