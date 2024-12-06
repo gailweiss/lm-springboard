@@ -28,7 +28,7 @@ class LM(nn.Module):
         self.ignore_index = self.tokenizer.pad_token_id
         self.celoss = nn.CrossEntropyLoss(ignore_index=self.ignore_index)
         self.ordered_tokens = \
-            list(self.tokenizer.convert_ids_to_nice_string(i) for i in
+            list(self.tokenizer.convert_ids_to_nice_string([i]) for i in
                  range(self.tokenizer.vocab_size()))
 
     def in_main_part(self, param_name):
