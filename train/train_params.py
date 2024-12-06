@@ -11,7 +11,7 @@ class TrainParams:
     gradient_clip_val: float = 0.5
     val_check_epoch_frac: float = 0.1
     max_sample_tokens: int = 30
-    sample_temperature: float = 0.5
+    sample_temperature: float = 1
     no_wandb: bool = False
     hyperparams_log_freq: int = 100
     lr: float = 1e-3
