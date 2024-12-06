@@ -62,10 +62,23 @@ def get_pythia(chkpt_id=0, sizestr="70m", deduped=True, cap_max_seq_len=-1):
     # as suggested by name above, this should be 4...
     assert model_params.dim_ff_factor == 4
     assert model_params.dim_ff_factor * model_params.dim == hidden_dim
-    model_params.tokenizer_source_name = modelstr
     model_params.pos_encoding = modelstr
     model_params.individual_head_params = False
 
-    tokenizer = MyTokenizer(data=None, name=modelstr, no_crop=True)
+    tokenizerstr = modelstr
+    for n in ["-70m-deduped"]:
+        # model versions that i've explicitly verified have the same tokenizer
+        # at every checkpoint, even though this is probably true for every
+        # single version.
+        # if one of these versions, load the tokenizer from the first
+        # checkpoint, for consistency/convenience down the line 
+        # (e.g. when finetuning from different checkpoints, no reason to have
+        # this require different datamodules because they think they have
+        # different tokenizers)
+        if "-70m-deduped" in modelstr:
+            tokenizerstr = modelstr[:-len(stepstr)] + f"step{chkpts[0]}"
+    model_params.tokenizer_source_name = tokenizerstr
+
+    tokenizer = MyTokenizer(data=None, name=tokenizerstr, no_crop=True)
     lm = LM(tokenizer, gptneox, model_params)
     return lm
