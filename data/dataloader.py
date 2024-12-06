@@ -98,6 +98,14 @@ def get_existing_datamodule(data_params, model_params):
                     model_params.custom_tokenizer_ntokens):
                 print("mismatch on number of tokens")
                 return False
+        def same_keys(d,p):
+            return sorted(list(d.keys())) == sorted(list(vars(p).keys()))
+        if not same_keys(dpd, data_params):
+            print("mismatch on data attributes---different branch or commit")
+            return False
+        if not same_keys(mpd, model_params):
+            print("mismatch on model attributes---different branch or commit")
+            return Fale
         return True
 
     print("checking for existing datamodule")
