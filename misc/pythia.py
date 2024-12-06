@@ -12,27 +12,23 @@ chkpts = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512] + \
 # 1. pythia was not trained with a BOS token: see
 #    https://github.com/EleutherAI/pythia/issues/123 . 
 #    Instead all documents being trained were concatenated with an </endoftext>
-#    token between them (registered in the pythia_tokenizer as its bos and eos
-#    token). If using this to fine tune, then can arbitrarily decide that
+#    token between them (registered in the as its bos and eos token).
+#    If using this to fine tune, then can arbitrarily decide that
 #    target task does start with BOS, but if using this to evaluate its
 #    perplexities on different tokens, then whether this BOS should be added or
 #    not depends on whether my samples are aligned with actual starts of new
 #    sequences
 
 
-def get_pythia(chkpt_id=0, sizestr="70m", deduped=True, cap_max_seq_len=-1,
-               cache=False):
+def get_pythia(chkpt_id=0, sizestr="70m", deduped=True, cap_max_seq_len=-1):
     stepstr = f"step{chkpts[chkpt_id]}"
     modelstr =  f"EleutherAI/pythia-{sizestr}"
     loadstr = modelstr
     if deduped:
         modelstr += "-deduped"
     modelstr += f"/{stepstr}"
-    if cache:
-        cache_dir = f"../../cached_hf_models/{modelstr}"
 
     gptneox = GPTNeoXForCausalLM.from_pretrained(loadstr, revision=stepstr)
-    pythia_tokenizer = AutoTokenizer.from_pretrained(loadstr, revision=stepstr)
 
     model_params = make_mp()
 
