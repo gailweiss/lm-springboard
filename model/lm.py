@@ -159,6 +159,18 @@ class LM(nn.Module):
             per_token_res = cat_with_dim1_pad(per_token_res)
         return mean_l, max_l, min_l, total_tokens, per_token_res
 
+    def reshape_z(self, x, z):
+        # x shape: batch size X (input) seq len
+        # z shape: batch size X (output) seq len X "vocab size"
+        # "vocab size" in quotes because in practice, some pretrained models
+        # have a de-embedding matrix that is larger than the actual vocab size,
+        # see e.g. the discussion here: 
+        # https://github.com/huggingface/transformers/issues/4875, in practice
+        # i have hit this through the pythia models. hence have to reshape z
+        # with bs and seq len instead of just z.view(-1, self.n_tokens)
+        bs, seq_len = x.shape
+        return z.view(bs * seq_len, -1)
+
     def get_batch_xyz(self, batch, loss_requests=None):
         indices, mask = batch["x_indices"], batch["mask"]
         if mask is not None:
@@ -174,7 +186,7 @@ class LM(nn.Module):
 
     def get_losses(self, batch, loss_requests=None, accs_too=False):
         x, y, z = self.get_batch_xyz(batch, loss_requests=loss_requests)
-        z, y = z.view(-1, self.n_tokens), y.reshape(-1)
+        z, y = self.reshape_z(x, z), y.reshape(-1)
         main_loss = self.celoss(z, y)
         losses = {"main": main_loss}
         if accs_too:
@@ -192,7 +204,7 @@ class LM(nn.Module):
         z = z.detach()
         loss_fn = nn.CrossEntropyLoss(reduction="none",
                                       ignore_index=self.ignore_index)
-        losses = loss_fn(z.view(-1, self.n_tokens),
+        losses = loss_fn(self.reshape_z(x, z),
                          y.reshape(-1)).view(y.shape)
         losses = losses.detach()
         res = losses if before_exp else torch.exp(losses)  # perplexity: e^loss
