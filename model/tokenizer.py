@@ -182,7 +182,6 @@ def getBertLikeTokenizer(name, data=None, custom_vocab_size=30,
     if "pythia" in name:
         stepstr = name.split("/")[-1]
         loadstr = name[:-(1 + len(stepstr))]
-        print("getting model using:",loadstr,"and",stepstr)
         # pythia model name format: 
         # "EleutherAI/pythia-{size_str}" + optional "-deduped" + "/{stepstr}"
         pythiatok = AutoTokenizer.from_pretrained(loadstr, revision=stepstr)
