@@ -38,7 +38,7 @@ def _load_custom_tokenizer(path):
 
 def load_stored_tokenizer_if_exists(source_name, folder_name, verbose):
     if (source_name in ["custom", "char"]) or \
-       (True in [n in source_name for n in ["gpt2", "bert"]]):
+       (True in [n in source_name for n in ["gpt2", "bert", "pythia"]]):
         # parallel conditions to those of 'save' functions in MyTokenizer below
         return MyTokenizer(name=source_name, from_path=folder_name,
                            verbose_init=verbose)
