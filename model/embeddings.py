@@ -48,6 +48,8 @@ class PositionalEmbedding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.d_forwards = d_model
         self.forwards_embedding = nn.Embedding(max_len, self.d_forwards)
+        nn.init.normal_(self.forwards_embedding.weight, mean=0.0, std=0.02,
+                        generator=None)
 
     def device(self):
         return next(self.parameters()).device
@@ -86,6 +88,8 @@ class FullEmbedding(nn.Module):
                                               max_len=max_len)
 
         word_embedding = nn.Embedding(num_tokens, d_model)
+        nn.init.normal_(word_embedding.weight, mean=0.0, std=0.02,
+                        generator=None)
         self.separate_encodings = separate_encodings
 
         self.word = word_embedding
