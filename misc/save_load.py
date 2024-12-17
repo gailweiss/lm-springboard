@@ -51,19 +51,24 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
         pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
 
 
-def load_model_info(folder_name, with_train_stats=False):
+def load_model_info(folder_name, with_train_stats=False, verbose=True):
     if not Path(folder_name).exists():
         raise ValueError(f"Folder {folder_name} does not exist")
 
     res = {"params": {}}
     with open(path_join(folder_name, "model_params.json"), "r") as f:
-        res["params"]["model_params"] = make_mp(**json.load(f))
+        res["params"]["model_params"] = make_mp(verbose=verbose, **json.load(f))
     with open(path_join(folder_name, "data_params.json"), "r") as f:
-        res["params"]["data_params"] = make_dp(**json.load(f))
+        res["params"]["data_params"] = make_dp(verbose=verbose, **json.load(f))
     with open(path_join(folder_name, "train_params.json"), "r") as f:
-        res["params"]["train_params"] = make_tp(**json.load(f))
+        res["params"]["train_params"] = make_tp(verbose=verbose, **json.load(f))
 
     for pn, pd in res["params"].items():
+        if None is pd:
+            if verbose:
+                print("failed to load params:", pn, 
+                      "--they might be from a different branch. skipping")
+            return None
         for k, v in asdict(pd).items():
             if isinstance(v, list):
                 # json turns tuples into lists, but saved configs (i.e.
@@ -97,7 +102,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
     if not Path(folder_name).exists():
         raise ValueError(f"Folder {folder_name} does not exist")
 
-    res = load_model_info(folder_name)
+    res = load_model_info(folder_name, verbose=verbose)
 
     res["params"]["train_params"].no_wandb = True  # no wandb in loaded models
     # - or it will try (unsuccessfully) to send validation losses to wandb when

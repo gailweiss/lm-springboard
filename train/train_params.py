@@ -30,9 +30,10 @@ class TrainParams:
 
 
 def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
-            **d):
+            verbose=True, **d):
     return apply_dataclass(TrainParams, d, forgiving=forgiving,
-                           convert_lists_to_tuples=convert_lists_to_tuples)
+                           convert_lists_to_tuples=convert_lists_to_tuples,
+                           verbose=verbose)
     # ready for fixes over time
 
 

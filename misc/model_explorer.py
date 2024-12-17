@@ -100,7 +100,7 @@ def date_in_range(i, min_date, max_date):
     return True
 
 
-def all_identifiers_with_configs(kws, min_date=None, max_date=None):
+def all_identifiers_with_configs(kws, min_date=None, max_date=None, verbose=False):
     # kws: nested dict of configs.
     # level one: data_params, train_params, model_params
     # level two: each config that is being specified in this request,
@@ -123,7 +123,10 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None):
     res = [i for i, path in res if date_in_range(i, min_date, max_date)]
 
     def get_param(identifier, paramset_name, param_name):
-        d = vars(get_info(identifier)["params"][paramset_name])
+        info = get_info(identifier, verbose=verbose)
+        if None is info:
+            return []
+        d = vars(info["params"][paramset_name])
         return d.get(param_name, [])
         # [] is not a valid param value, for reasons outlined above
 
@@ -241,7 +244,7 @@ def get_model_by_identifier(identifier, checkpoint=final_chkpt, verbose=True,
         if id2 in get_model_cache:   # data already loaded, no harm
             return get_model_cache[id2]
 
-    p = get_full_path(identifier, checkpoint=checkpoint)
+    p = get_full_path(identifier, checkpoint=checkpoint, verbose=verbose)
     if None is p:
         if verbose:
             print("did not find path with identifier:", identifier)
@@ -278,7 +281,7 @@ def get_all_checkpoints_by_identifier(identifier, verbose=True, with_data=True,
         if id2 in get_checkpoints_cache:  # no harm in extra info
             return get_checkpoints_cache[id2]
 
-    p_final = get_full_path(identifier, checkpoint=final_chkpt)
+    p_final = get_full_path(identifier, checkpoint=final_chkpt, verbose=verbose)
     p_containing = p_final[:-len(f"/{final_chkpt}/")]
     paths = glob_nosquares(f"{p_containing}/*/")
     results = {"models": {}}
@@ -309,12 +312,18 @@ def clear_chkpts_cache():
 info_cache = {}
 
 
-def get_info(identifier, with_train_stats=False):
+def get_info(identifier, with_train_stats=False, verbose=True):
     # always caches, info is generally small
     cache_id = (identifier, with_train_stats)
     if cache_id not in info_cache:
-        path = get_full_path(identifier, checkpoint=final_chkpt)
-        res = load_model_info(path, with_train_stats=with_train_stats)
+        path = get_full_path(identifier, checkpoint=final_chkpt, verbose=verbose)
+        if None is path:
+            if verbose:
+                print("could not get final checkpoint path for identifier:",
+                      identifier)
+            return None  # don't cache, in case file gets made/copied in soon
+        res = load_model_info(path, with_train_stats=with_train_stats,
+                              verbose=verbose)
         info_cache[cache_id] = res
     return info_cache[cache_id]
 
@@ -659,7 +668,7 @@ def show_head_progress(identifier, x, layer, head, cache=True, store=False):
             fig.savefig(f"{folder_name}/{nsamples}")
 
 
-def get_full_path(identifier, checkpoint=final_chkpt):
+def get_full_path(identifier, checkpoint=final_chkpt, verbose=True):
     paths = []
     for p in models_paths:
         paths += glob_nosquares(f"{p}/**/", recursive=True)
@@ -668,11 +677,13 @@ def get_full_path(identifier, checkpoint=final_chkpt):
     if len(paths) == 1:
         return paths[0]
     if len(paths) < 1:
-        print("could not find model folder with:", identifier, checkpoint)
+        if verbose:
+            print("could not find model folder with:", identifier, checkpoint)
         return None
     if len(paths) > 1:
-        print("found multiple model folders with:", identifier, checkpoint)
-        print("\n", "\n".join(paths))
+        if verbose:
+            print("found multiple model folders with:", identifier, checkpoint)
+            print("\n", "\n".join(paths))
         return None
 
 

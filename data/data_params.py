@@ -18,7 +18,7 @@ class DataParams:
 
 
 def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
-            convert_lists_to_tuples=False, **d):
+            convert_lists_to_tuples=False, verbose=True, **d):
     # correct old data_params to new attr:
     synth_task_note = "is_synthetic_task"
     if synth_task_note in d:
@@ -26,7 +26,8 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
         del d[synth_task_note]
 
     res = apply_dataclass(DataParams, d, forgiving=forgiving,
-                          convert_lists_to_tuples=convert_lists_to_tuples)
+                          convert_lists_to_tuples=convert_lists_to_tuples,
+                          verbose=verbose)
 
     if redo_synth_eval or d.get("task_type", "?") == "?":
         set_synthetic_task_flag(res)

@@ -243,7 +243,7 @@ def glob_nosquares(p, **kw):
 
 def apply_dataclass(dataclass, given_attrs, forgiving=False,
                     takes_extras=False, convert_lists_to_tuples=True,
-                    name_changes=None):
+                    name_changes=None, verbose=True):
 
     if convert_lists_to_tuples:
         given_attrs = {n: tuple(v) if isinstance(v, list) else v for
@@ -259,7 +259,8 @@ def apply_dataclass(dataclass, given_attrs, forgiving=False,
     extra_attrs = {n: v for n, v in given_attrs.items() if n not in allowed}
     expected_attrs = {n: v for n, v in given_attrs.items() if n in allowed}
     if extra_attrs and not forgiving:
-        print("unexpected properties:", extra_attrs, "--not loading params")
+        if verbose:
+            print("unexpected properties:", extra_attrs, "--not loading params")
         return None
     res = dataclass(**given_attrs)
     if takes_extras:
