@@ -12,6 +12,7 @@ import json
 import itertools
 from copy import deepcopy
 from data.dataloader import datamodules_paths, LMDataModule
+from matplotlib.backends.backend_pdf import PdfPages
 
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
@@ -475,10 +476,17 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  ylabel_ax1=None, ylabel_ax2=None,
                  add_to=None, plot_type="scatter", stylist=None,
                  max_x=None, min_x=None, max_y=None, min_y=None,
-                 legend_markerscale=10, legend_outside=False):
+                 legend_markerscale=10, legend_outside=False,
+                 add_to_pdf=None):
     # identifiers can be a dict giving the identifiers special names for
     # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name)
+
+    if None is not add_to_pdf:
+        assert isinstance(add_to_pdf, PdfPages)
+        # create as: PdfPages(filename)
+        # assert here more as a reminder of what this is and how to make it
+
     if isinstance(identifiers, str):
         identifiers = [identifiers]
     if isinstance(metric_names_ax1, str):
@@ -559,7 +567,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         fn = f"../metrics/{filename}"
         directory = '/'.join(fn.split('/')[:-1])
         prepare_directory(directory)
-        fig.savefig(f"{fn}.png", bbox_inches='tight')
+        fig.savefig(f"{fn}.png", bbox_inches="tight")
         with open(f"{fn}.txt", "w") as f:
             print(f"plot in {fn} made from identifiers:{identifiers}\n",
                   f"and metrics:\n{all_metric_names}",
@@ -567,6 +575,10 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
             print("identifier full paths:\n", file=f)
             for t in identifiers:
                 print(t, "\t:", get_full_path(t), "\n", file=f)
+
+    if None is not add_to_pdf:
+        add_to_pdf.savefig(fig, bbox_inches="tight")
+
     return fig, ax
 
 
