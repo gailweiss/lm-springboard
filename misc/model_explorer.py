@@ -26,6 +26,19 @@ def identifier2timestamp(identifier):
     return -1
 
 
+def model_id_from_top_of_string(string):
+    assert True not in [s in string for s in ["gpt2", "Eleuther"]]
+    # this is for own models
+    shortest_example_m_id = "2024-01-01-00-00-00---0"
+    m_id_start = string[:len(shortest_example_m_id)]
+    remaining = list(string[len(shortest_example_m_id):])
+    d = remaining.pop(0)
+    while d in "0123456789":
+        m_id_start += d
+        d = remaining.pop(0) if remaining else "!"
+    return m_id_start
+
+
 def is_timestamp(seq):
     if not isinstance(seq, str):
         return False
