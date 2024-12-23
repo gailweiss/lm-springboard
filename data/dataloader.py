@@ -52,6 +52,8 @@ def get_data(data_params):
         samples = wikitextloader()
     elif data_params.dataset_name == "ptb":
         samples = ptbloader()
+    elif data_params.dataset_name.startswith("c4-"):  # eg c4-en 
+        samples = c4loader(data_params)
     elif data_params.task_type == "synthetic":
         samples = syntheticdatasets.get(data_params.dataset_name)
     elif None is not get_local_datafolder(data_params.dataset_name):
@@ -384,6 +386,29 @@ def ptbloader():
     d = datasets.load_dataset("ptb_text_only")
     d = {n: d[n]["sentence"] for n in d}
     return d  # see if this works
+
+
+def c4loader(data_params):
+    specifier = data_params.dataset_name[len("c4-"):] # e.g., "c4-en" has end "en"
+    print(specifier)
+    d = datasets.load_dataset("allenai/c4", specifier, streaming=True)
+    train_d = iter(d["train"])
+    val_d = iter(d["validation"])  # no test, so will make dummy test from this
+    assert None is not data_params.debug_crop
+    total_load = int(data_params.debug_crop)
+    val_frac = data_params.val_pct/100
+    test_frac = data_params.test_pct/100
+    train_frac = 1 - (val_frac + test_frac)
+    n_train_fullsamples = int(total_load * train_frac)
+    n_val_fullsamples = int(total_load * val_frac)
+    n_test_fullsamples = int(total_load * test_frac)
+    res = {}
+    res["train"] = [next(train_d)["text"] for _ in range(n_train_fullsamples)]
+    val_and_test = [next(val_d)["text"] for _ in range(n_val_fullsamples +
+                                                       n_test_fullsamples)]
+    res["validation"] = val_and_test[:n_val_fullsamples]
+    res["test"] = val_and_test[n_val_fullsamples:]
+    return res
 
 
 def wikitextloader():
