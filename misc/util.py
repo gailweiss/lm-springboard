@@ -164,8 +164,7 @@ def is_all_type(lst, t):
     return False not in [isinstance(v, t) for v in lst]
 
 
-def print_nicely_nested(d, file=sys.stdout, skip_first=True, indent=" " * 8,
-                        hide_braces=True):
+def print_nicely_nested(d, file=sys.stdout, indent=" " * 8):
 
     def indents(n):
         return n * indent
