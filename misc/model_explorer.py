@@ -27,11 +27,30 @@ def identifier2timestamp(identifier):
     return -1
 
 
+shortest_example_m_id = "2024-01-01-00-00-00---0"
+example_timestamp = "2024-08-20--12-12-12"
+
+
+def all_aligned_dashes_digits(s1, s2):
+    if not (isinstance(s1, str) and isinstance(s2, str)):
+        return False
+    if not len(s1) == len(s2):
+        return False
+    digits = "0123456789"
+    for c1, c2 in zip(s1, s2):
+        if c1 in digits and c2 in digits:
+            continue
+        if c1 == "-" and c2 == "-":
+            continue
+        return False
+    return True
+
+
 def model_id_from_top_of_string(string):
-    assert True not in [s in string for s in ["gpt2", "Eleuther"]]
-    # this is for own models
-    shortest_example_m_id = "2024-01-01-00-00-00---0"
     m_id_start = string[:len(shortest_example_m_id)]
+    if not all_aligned_dashes_digits(m_id_start, shortest_example_m_id):
+        # this string doesn't open with a model id
+        return None
     remaining = list(string[len(shortest_example_m_id):])
     d = remaining.pop(0)
     while d in "0123456789":
@@ -41,24 +60,20 @@ def model_id_from_top_of_string(string):
 
 
 def is_timestamp(seq):
-    if not isinstance(seq, str):
-        return False
-    example_timestamp = "2024-08-20--12-12-12"
-    if not len(seq) == len(example_timestamp):
-        return False
-    for s, e in zip(seq, example_timestamp):
-        if e == "-":
-            if not s == "-":
-                return False
-        elif s not in "0123456789":
-            return False
-    return True
+    return all_aligned_dashes_digits(seq, example_timestamp)
 
 
 def is_identifier(seq):
     if not isinstance(seq, str):
         return False
-    return is_timestamp(identifier2timestamp(seq))
+    if "---" in seq:
+        if seq.count("---") > 1:
+            return False
+        seq, rand = seq.split("---")
+        for d in rand:
+            if d not in "0123456789":
+                return False
+    return is_timestamp(seq)
 
 
 def auto_identifiers():
@@ -155,16 +170,18 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None, verbose=Fals
     return res
 
 
-def compare_configs(identifiers, print_padding=30):
+def print_config_compare(identifiers, print_padding=30, file=sys.stdout,
+                         just_list_differing_keys=False):
     ids_with_missing_paramsets = \
         set([i for i in identifiers if None in get_info(i).values()])
     if ids_with_missing_paramsets:
-        print("following ids have a missing paramset:")
+        print("following ids have a missing paramset:", file=file)
         for i in sorted(list(ids_with_missing_paramsets)):
             missing_sets = [psn for psn in get_info(i) if
                             None is get_info(i)[psn]]
-            print(f"\n{i}, missing: {missing_sets}. path: {get_full_path(i)}")
-        print("==\n\n")
+            print(f"\n{i}, missing: {missing_sets}. path: {get_full_path(i)}",
+                  file=file)
+        print("==\n\n", file=file)
 
     def params_dicts(model_info):
         return {k: vars(v) for k, v in model_info["params"].items()}
@@ -175,15 +192,15 @@ def compare_configs(identifiers, print_padding=30):
     example_id, example_info = infos[0]
     for i, info in infos:
         if set(example_info.keys()) != set(info.keys()):
-            print("in ids:", example_id, "vs", i, ",")
+            print("in ids:", example_id, "vs", i, ",", file=file)
             print("have different structures, cant proceed:",
-                  example_info.keys(), "vs", info.keys())
+                  example_info.keys(), "vs", info.keys(), file=file)
             return -1
         for k in example_info:
             if set(example_info[k].keys()) != set(info[k].keys()):
-                print("in ids:", example_id, "vs", i, ",")
+                print("in ids:", example_id, "vs", i, ",", file=file)
                 print(f"have different structures in {k}, cant proceed:",
-                      example_info[k].keys(), "vs", info[k].keys())
+                      example_info[k].keys(), "vs", info[k].keys(), file=file)
                 return -1
 
     all_vals = deepcopy(example_info)
@@ -194,21 +211,29 @@ def compare_configs(identifiers, print_padding=30):
                 all_vals[k1][k2].add(info[k1][k2])
 
     padline = "="*40 + "\n"
-    print(f"{padline}\tconstant values:\n{padline}")
-    for k1 in all_vals:
-        print(f"\n === {k1}: ===\n")
-        for k2 in all_vals[k1]:
-            if len(all_vals[k1][k2]) == 1:
-                print(f"{pad(k2, print_padding, 'left')}:\t",
-                      list(all_vals[k1][k2])[0])
 
-    print(f"\n\n{padline}\tvaried values:\n{padline}")
-    for k1 in all_vals:
-        print(f"\n=== {k1}: ===\n")
-        for k2 in all_vals[k1]:
-            if len(all_vals[k1][k2]) > 1:
-                print(f"{pad(k2, print_padding, 'left')}:\t",
-                      list(all_vals[k1][k2]))
+    if not just_list_differing_keys:
+        print(f"{padline}\tconstant values:\n{padline}", file=file)
+        for k1 in all_vals:
+            print(f"\n === {k1}: ===\n", file=file)
+            for k2 in all_vals[k1]:
+                if len(all_vals[k1][k2]) == 1:
+                    print(f"{pad(k2, print_padding, 'left')}:\t",
+                          list(all_vals[k1][k2])[0], file=file)
+
+    print(f"\n\n{padline}\tvaried values:\n{padline}", file=file)
+    if just_list_differing_keys:
+        for k1 in all_vals:
+            for k2 in all_vals[k1]:
+                if len(all_vals[k1][k2]) > 1:
+                    print(f"{k1}:\t\t{k2}", file=file)
+    else:
+        for k1 in all_vals:
+            print(f"\n=== {k1}: ===\n", file=file)
+            for k2 in all_vals[k1]:
+                if len(all_vals[k1][k2]) > 1:
+                    print(f"{pad(k2, print_padding, 'left')}:\t",
+                          list(all_vals[k1][k2]), file=file)
 
 
 def checkpoint_ids(identifier):
@@ -241,7 +266,7 @@ def get_datamodule_by_identifier(identifier):
         if paths:
             assert len(paths) == 1
             path = paths[0]
-            print(path)
+            print("getting datamodule from:", path)
             return LMDataModule(None, None, None, None, from_folder=path)
 
 
@@ -261,7 +286,8 @@ def get_model_by_identifier(identifier, checkpoint=final_chkpt, verbose=True,
     p = get_full_path(identifier, checkpoint=checkpoint, verbose=verbose)
     if None is p:
         if verbose:
-            print("did not find path with identifier:", identifier)
+            print("did not find path with identifier and checkpoint:",
+                  identifier, checkpoint)
         return None
     if verbose:
         print("found model path:", p)
@@ -280,6 +306,18 @@ def get_model_by_identifier(identifier, checkpoint=final_chkpt, verbose=True,
         get_model_cache[cache_identifier] = res
 
     return res
+
+
+def get_checkpoint_names_by_identifier(identifier):
+    paths = []
+    for p in models_paths:
+        paths += glob_nosquares(f"{p}/**/", recursive=True)
+    paths = [p for p in paths if f"/{identifier}/" in p]
+    paths = [p for p in paths if p.split("/")[-3] == identifier]
+    # chkpt path format: 
+    # '{task-and-config specific models folder}/{long model name}/{identifier}/{chkpt}/'
+    chkpts = [p.split("/")[-2] for p in paths]
+    return sorted(chkpts, key=lambda x:int(x) if not x=="final" else torch.inf)
 
 
 get_checkpoints_cache = {}
@@ -477,7 +515,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  add_to=None, plot_type="scatter", stylist=None,
                  max_x=None, min_x=None, max_y=None, min_y=None,
                  legend_markerscale=10, legend_outside=False,
-                 add_to_pdf=None):
+                 add_to_pdf=None, close_at_end=False):
     # identifiers can be a dict giving the identifiers special names for
     # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name)
@@ -579,6 +617,8 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
     if None is not add_to_pdf:
         add_to_pdf.savefig(fig, bbox_inches="tight")
 
+    if close_at_end:
+        plt.close()
     return fig, ax
 
 
