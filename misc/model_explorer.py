@@ -8,6 +8,7 @@ from misc.util import prepare_directory, glob_nosquares, pad
 import sys
 from os.path import join as path_join
 from misc.util import printer_print as print
+from misc.util import print_nicely_nested
 import json
 import itertools
 from copy import deepcopy
@@ -509,9 +510,37 @@ def _plot(ax, x, y, s=0.5, plot_type="scatter",
         return ax.plot(x, y, **extra_kwargs)[0]
 
 
+def get_aligned_vals(train_stats, metric1, metric2):
+    d = train_stats[metric1]
+    # deprecating, no longer dealing with this:
+    # if len(d[0]) == 3:  # older version
+    #     n_train_samples, metric, stat_counter = list(zip(*d))    
+    stat_syncer1, n_train_samples1, stat_counter1, vals1 = \
+        list(zip(*train_stats[metric1]))
+    stat_syncer2, n_train_samples2, stat_counter2, vals2 = \
+        list(zip(*train_stats[metric2]))
+    if stat_syncer1 == stat_syncer2:
+        dropped_vals = (None, None)
+    else:
+        print("skipping records for alignment of", metric1, "with", metric2)
+        d1 = {s: v for s, v in zip(stat_syncer1, vals1)}
+        d2 = {s: v for s, v in zip(stat_syncer2, vals2)}
+        s1 = set(d1.keys())
+        s2 = set(d2.keys())
+        diff1 = s1.difference(s2)
+        diff2 = s2.difference(s1)
+        dropped_vals = (diff1, diff2)
+        shared = set(d1.keys()).intersection(set(d2.keys()))
+        paired_metrics = [(d1[s], d2[s]) for s in sorted(list(shared))]
+        vals1, vals2 = zip(*paired_metrics)
+        print("skipped record points are (respectively):", dropped_vals)
+    return vals1, vals2, dropped_vals
+
+
+
 def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  title=None, filename=None, colors=None,
-                 ylabel_ax1=None, ylabel_ax2=None,
+                 ylabel_ax1=None, ylabel_ax2=None, x_axis="n_train_samples",
                  add_to=None, plot_type="scatter", stylist=None,
                  max_x=None, min_x=None, max_y=None, min_y=None,
                  legend_markerscale=10, legend_outside=False,
@@ -541,7 +570,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         ylabel_ax2 = _ylabel(metric_names_ax2)
     fig, ax1 = plt.subplots() if None is add_to else add_to
 
-    ax1.set_xlabel("n_train_samples")
+    ax1.set_xlabel(x_axis)
     ax1.set_ylabel(ylabel_ax1)
 
     if metric_names_ax2:
@@ -561,6 +590,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
 
     color_i = 0
     artists = []
+    dropped_vals = {i: {} for i in identifiers}
     for ax, metric_names, ylabel in [(ax1, metric_names_ax1, ylabel_ax1),
                                      (ax2, metric_names_ax2, ylabel_ax2)]:
         if not ax:
@@ -571,12 +601,9 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                 if m not in t_info["train_stats"]:
                     continue  # eg if trying to show copy loss on several
                     # identifiers but one is just pairs
-                d = t_info["train_stats"][m]
-                if len(d[0]) == 3:  # older version
-                    n_train_samples, metric, stat_counter = list(zip(*d))
-                else:  # newer version
-                    stat_syncer, n_train_samples, stat_counter, metric = \
-                        list(zip(*d))
+                metric, x_vals, dv = get_aligned_vals(t_info["train_stats"], 
+                                                m, x_axis)
+                dropped_vals[i][(m, x_axis)] = dv
                 extra_kwargs = stylist(i, m) if None is not stylist else {}
                 if "color" not in extra_kwargs and None is not colors:
                     extra_kwargs["color"] = colors[color_i]
@@ -588,7 +615,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                 if "marker" not in extra_kwargs:
                     extra_kwargs["marker"] = "."
                 artists.append(
-                    _plot(ax, n_train_samples, metric, plot_type=plot_type,
+                    _plot(ax, x_vals, metric, plot_type=plot_type,
                           max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
                           extra_kwargs=extra_kwargs))
 
@@ -613,6 +640,11 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
             print("identifier full paths:\n", file=f)
             for t in identifiers:
                 print(t, "\t:", get_full_path(t), "\n", file=f)
+            print("\n\nfor each id and metric, to take only points with",
+                  "clear x axis value, dropped values at these stat-syncing",
+                  "positions: (format: #metric points dropped,",
+                  "#x-axis ({x_axis}) points dropped)\n", file=f)
+            print_nicely_nested(dropped_vals, file=f)
 
     if None is not add_to_pdf:
         add_to_pdf.savefig(fig, bbox_inches="tight")
