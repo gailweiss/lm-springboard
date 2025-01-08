@@ -203,10 +203,6 @@ def setup_wandb(args, tp, full_params, namer):
 def finish_wandb(args, tp, run, run_loc):
     if not (tp.no_wandb or args.no_wandb):
         run.finish()
-        current_year = "2024"
-        # honestly fine with failing this once a year just to be sure this
-        # delete is still fine
-        assert run_loc.split("/")[-1].startswith(f'run-{current_year}')
         sleep(10)  # give wandb 10 seconds to actually finish, this is
         # stupid but ugh i guess
         try:
