@@ -28,7 +28,7 @@ def identifier2timestamp(identifier):
     return -1
 
 
-shortest_example_m_id = "2024-01-01-00-00-00---0"
+shortest_example_m_id = "2024-01-01--00-00-00---0"
 example_timestamp = "2024-08-20--12-12-12"
 
 
