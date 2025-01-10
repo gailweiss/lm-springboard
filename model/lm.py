@@ -182,10 +182,12 @@ class LM(nn.Module):
         # type 'long' and will crash without explanation otherwise, so lets
         # just be safe
         z = self(x)["logits"]
-        return x, y, z
+        res = {"x": x, "y": y, "z": z}
+        return res
 
     def get_losses(self, batch, loss_requests=None, accs_too=False):
-        x, y, z = self.get_batch_xyz(batch, loss_requests=loss_requests)
+        a = self.get_batch_xyz(batch, loss_requests=loss_requests)
+        x, y, z = a["x"], a["y"], a["z"]
         z, y = self.reshape_z(x, z), y.reshape(-1)
         main_loss = self.celoss(z, y)
         losses = {"main": main_loss}
@@ -195,12 +197,15 @@ class LM(nn.Module):
             correct = torch.logical_and(z_match, y_mask).sum()
             count = y_mask.sum()
             accs = {"main": (correct / count).item()}
-        res = {"loss": losses, "acc": accs} if accs_too else losses
-        return res, x.shape[0]  # num samples
+        else:
+            accs = None
+        res = {"loss": losses, "acc": accs, "n_samples": x.shape[0]}
+        return res
 
     def batch_perplexities(self, batch, before_exp=False):
         with torch.no_grad():
-            x, y, z = self.get_batch_xyz(batch)
+            a = self.get_batch_xyz(batch)
+            x, y, z = a["x"], a["y"], a["z"]
         z = z.detach()
         loss_fn = nn.CrossEntropyLoss(reduction="none",
                                       ignore_index=self.ignore_index)

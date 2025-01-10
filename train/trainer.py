@@ -193,12 +193,12 @@ class Trainer(pl.LightningModule):
         self.maybe_save_checkpoint()
         clear_gpu_caches()
 
-        la, n_samples = self.model.get_losses(batch, accs_too=True)
-        losses, accs = la["loss"], la["acc"]
+        a = self.model.get_losses(batch, accs_too=True)
+        losses, accs, n_samples = a["loss"], a["acc"], a["n_samples"]
         self.n_train_samples += n_samples
 
         for sn in ["loss", "acc"]:
-            self.record_type_stats(la[sn], self.curr_train_stats_by_type[sn],
+            self.record_type_stats(a[sn], self.curr_train_stats_by_type[sn],
                                    from_train=True, stat_name=sn)
 
         self.log("train_batch_loss", losses["main"].item())
@@ -229,11 +229,12 @@ class Trainer(pl.LightningModule):
             self.n_opt_steps += 1
 
     def validation_step(self, batch, batch_idx):
-        la, n_samples = self.model.get_losses(batch, accs_too=True)
+        a = self.model.get_losses(batch, accs_too=True)
+        n_samples = a["n_samples"]
         for sn in ["loss", "acc"]:
-            self.record_type_stats(la[sn], self.curr_val_stats_by_type[sn],
+            self.record_type_stats(a[sn], self.curr_val_stats_by_type[sn],
                                    stat_name=sn)
-        return la["loss"]["main"].item()
+        return a["loss"]["main"].item()
 
     def make_main_scheduler(self, optimizer):
         if self.train_params.lr_scheduler_type == 'Plateau':
