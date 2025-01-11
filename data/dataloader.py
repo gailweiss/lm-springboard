@@ -147,6 +147,7 @@ class LMDataModule(pl.LightningDataModule):
     def __init__(self, data, tokenizer, data_params, model_params,
                  verbose_init=False, from_folder=None):
         super().__init__()
+        self.from_path = None
         self.verbose_init = verbose_init
         if None is not from_folder:
             self.setup_from_folder(from_folder)
