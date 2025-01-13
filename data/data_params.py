@@ -27,7 +27,7 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
 
     res = apply_dataclass(DataParams, d, forgiving=forgiving,
                           convert_lists_to_tuples=convert_lists_to_tuples,
-                          verbose=verbose)
+                          verbose=verbose, takes_extras=takes_extras)
 
     if redo_synth_eval or d.get("task_type", "?") == "?":
         set_synthetic_task_flag(res)

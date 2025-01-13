@@ -33,7 +33,7 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
             verbose=True, **d):
     return apply_dataclass(TrainParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples,
-                           verbose=verbose)
+                           verbose=verbose, takes_extras=takes_extras)
     # ready for fixes over time
 
 

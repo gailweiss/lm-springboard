@@ -261,7 +261,7 @@ def apply_dataclass(dataclass, given_attrs, forgiving=False,
         if verbose:
             print("unexpected properties:", extra_attrs, "--not loading params")
         return None
-    res = dataclass(**given_attrs)
+    res = dataclass(**expected_attrs)
     if takes_extras:
         [setattr(res, n, v) for n, v in extra_attrs.items()]
     return res

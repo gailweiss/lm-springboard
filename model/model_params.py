@@ -22,7 +22,7 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
             verbose=True, **d):
     return apply_dataclass(ModelParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples,
-                           verbose=verbose)
+                           verbose=verbose, takes_extras=takes_extras)
     # ready for fixes over time
 
 # the base code only provides vanilla transformer models, this is how these
