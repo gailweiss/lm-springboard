@@ -105,9 +105,11 @@ def get_existing_datamodule(data_params, model_params):
         if not same_keys(dpd, data_params):
             print("mismatch on data attributes---different branch or commit")
             return False
-        if not same_keys(mpd, model_params):
-            print("mismatch on model attributes---different branch or commit")
-            return False
+        # model staying the same not really important so long as the
+        # data-relevant attributes (tokenizer, sequence length) are fine
+        # if not same_keys(mpd, model_params):
+        #     print("mismatch on model attributes---different branch or commit")
+        #     return False
         return True
 
     print("checking for existing datamodule")
