@@ -203,6 +203,14 @@ class LMDataModule(pl.LightningDataModule):
         for sn in ["train_samples", "test_samples", "val_samples"]:
             indices = np.load(path_join(path, f"{sn}-indices.npy"))
             lengths = np.load(path_join(path, f"{sn}-lengths.npy"))
+
+            # TEMPORARY until stop using old dataloaders which didnt save
+            # pads correctly (anything older than 2025.01.14), and had
+            # them as -1 instead
+            if (indices == -1).sum() > 0:
+                indices = torch.as_tensor(indices)
+                indices = torch.where(
+                    indices == -1, self.tokenizer.pad_token_id, indices)
             setattr(self, sn, ForTorchDataSet(lengths, indices))
 
         self.finalise_data()
@@ -213,6 +221,7 @@ class LMDataModule(pl.LightningDataModule):
             indices = np.zeros((len(samples), lengths.max()), dtype=int)
             for i, (n, inds) in enumerate(zip(lengths, samples)):
                 indices[i, :n] = inds
+                indices[i, n:] = self.tokenizer.pad_token_id
             return lengths, indices
 
         for sn in ["train_samples", "test_samples", "val_samples"]:
@@ -458,7 +467,8 @@ def verysimplesamplesreader(path, data_params):
 
 def mycollate(b):
     # b: list of samples. each sample is a tuple of:
-    # (int length, tensor of indices).
+    # (int length, tensor of indices). the indices are padded with
+    # the tokenizer's pad_token_id 
     dtype = torch.long
     lengths = [s[0] for s in b]
     seqlen = max(lengths)
@@ -469,10 +479,12 @@ def mycollate(b):
     mask = torch.ones(batch_indices.shape, dtype=dtype) if with_mask else None
 
     for i, (n, seq) in enumerate(b):
-        batch_indices[i][:n] = seq[:n]
+        batch_indices[i] = seq[:seqlen]
         if with_mask:
             mask[i][:n] = 0
 
-    # indices shape: batch size X seq len
+    # indices shape: batch size X seq len.
+    # values past an individual sequence's length are filled with the
+    # tokenizer's pad_token_id
     # mask shape: batch size X seq len, or None. marks pads
     return {"x_indices": batch_indices, "mask": mask}
