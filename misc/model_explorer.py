@@ -533,7 +533,12 @@ def get_aligned_vals(train_stats, metric1, metric2):
         shared = set(d1.keys()).intersection(set(d2.keys()))
         paired_metrics = [(d1[s], d2[s]) for s in sorted(list(shared))]
         vals1, vals2 = zip(*paired_metrics)
-        print("skipped record points are (respectively):", dropped_vals)
+        def dropped_set_str(s):
+            if len(s) < 10:
+                return str(s)
+            return f"[{len(s)} vals]"
+        dvss = list(map(dropped_set_str, dropped_vals))
+        print("skipped record points are (respectively):", dvss)
     return vals1, vals2, dropped_vals
 
 
