@@ -160,6 +160,7 @@ class LM(nn.Module):
         return mean_l, max_l, min_l, total_tokens, per_token_res
 
     def get_batch_xyz(self, batch, loss_requests=None):
+        loss_requests = {} if None is loss_requests else loss_requests
         indices, mask = batch["x_indices"], batch["mask"]
         if mask is not None:
             indices = indices + (mask * self.ignore_index)
@@ -174,6 +175,7 @@ class LM(nn.Module):
         return res
 
     def get_losses(self, batch, loss_requests=None, accs_too=False):
+        loss_requests = {} if None is loss_requests else loss_requests
         a = self.get_batch_xyz(batch, loss_requests=loss_requests)
         x, y, z = a["x"], a["y"], a["z"]
         z, y = z.reshape(-1, z.shape[-1]), y.reshape(-1)
