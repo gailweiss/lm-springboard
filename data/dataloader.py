@@ -486,5 +486,6 @@ def mycollate(b):
     # indices shape: batch size X seq len.
     # values past an individual sequence's length are filled with the
     # tokenizer's pad_token_id
-    # mask shape: batch size X seq len, or None. marks pads
+    # mask shape: batch size X seq len, or None. marks pads.
+    # mask is 0 where the sequence is active and 1 where it is off (padded)
     return {"x_indices": batch_indices, "mask": mask}

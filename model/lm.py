@@ -134,22 +134,22 @@ class LM(nn.Module):
         mean_ls = []
         max_l = 0
         min_l = torch.inf
-        total_tokens = 0
+        total_preds = 0
         per_token_res = []
 
         for b in tqdm(dl):
             losses, stats = self.batch_perplexities(b, before_exp=True)
-            me, ma, mi, n_tokens, mask = stats
-            mean_ls.append(me)
-            if ma > max_l:
-                max_l = ma
-            if mi < min_l:
-                min_l = mi
-            total_tokens += n_tokens
+            mean_ls.append(stats["mean"])
+            if stats["max"] > max_l:
+                max_l = stats["max"]
+            if stats["min"] < min_l:
+                min_l = stats["min"]
+            total_preds += stats["num_preds"]
             if per_token:
                 ptr = losses if before_exp else torch.exp(losses)
-                if None is not mask:
-                    ptr = torch.where(mask == 1, dummy_res, ptr)
+                if None is not stats["mask"]:
+                    ptr = torch.where(stats["mask"].bool(), dummy_res, ptr)
+                    # false (0) - in sequence, true (1) - out of sequence
                 per_token_res.append(ptr)
                 # ptr shape: batch_size x max_seq_len
         mean_l = sum(mean_ls) / len(mean_ls)
@@ -157,13 +157,14 @@ class LM(nn.Module):
             mean_l, max_l, min_l = map(to_perp, [mean_l, max_l, min_l])
         if per_token_res:
             per_token_res = cat_with_dim1_pad(per_token_res)
-        return mean_l, max_l, min_l, total_tokens, per_token_res
+        res = {"mean": mean_l, "max": max_l, "min": min_l,
+               "total_preds": total_preds, "per_token_res": per_token_res}
+        return res
 
     def get_batch_xyz(self, batch, loss_requests=None):
         loss_requests = {} if None is loss_requests else loss_requests
-        indices, mask = batch["x_indices"], batch["mask"]
-        if mask is not None:
-            indices = indices + (mask * self.ignore_index)
+        indices = batch["x_indices"]
+        # padded indices have already been set to self.tokenizer.pad_token_id
         x = indices[:, :-1]
         y = indices[:, 1:]  # -> y not contiguous
         # -> y.view(-1) won't work, need reshape instead
@@ -182,10 +183,10 @@ class LM(nn.Module):
         main_loss = self.celoss(z, y)
         losses = {"main": main_loss}
         if accs_too:
-            y_mask = y != self.ignore_index
+            not_y_mask = y != self.ignore_index  # 1 if in sequence, 0 if out
             z_match = z.argmax(dim=-1) == y
-            correct = torch.logical_and(z_match, y_mask).sum()
-            count = y_mask.sum()
+            correct = torch.logical_and(z_match, not_y_mask).sum()
+            count = not_y_mask.sum()
             accs = {"main": (correct / count).item()}
         else:
             accs = None
@@ -204,25 +205,26 @@ class LM(nn.Module):
         losses = losses.detach()
         res = losses if before_exp else torch.exp(losses)  # perplexity: e^loss
 
-        mask = batch["mask"]
+        mask = batch["mask"]  # 0 if on (in sequence), 1 if off (past sequence)
         if None is not mask:
-            mask = mask[:, 1:]
+            mask = mask[:, 1:]  # output positions only
             mm = mask.reshape(-1)
-            num_masked = torch.where(mm == 1, 1, 0).sum().item()
+            num_masked = mask.sum().item()
             num_unmasked = mm.shape[0] - num_masked
-
-            res = torch.where(mask == 1, 0, res)
-            # 0 as dummy value useful for computing mean
+            # total actual length of input/output sequences
+            res = torch.where(mask.bool(), 0, res)
+            # 0 as dummy value useful for computing mean and max, below
         else:
             num_unmasked = losses.view(-1).shape[0]
         mean = res.sum() / num_unmasked
-        max_p = res.max()
+        max_p = res.max()  # all losses are >=0, so dummy value (0, above) fine
         if None is not mask:
-            min_p = torch.where(mask == 1, torch.inf, res).min()
+            min_p = torch.where(mask.bool(), torch.inf, res).min()
         else:
             min_p = res.min()
-        return res, (mean.item(), max_p.item(), min_p.item(),
-                     num_unmasked, mask)
+        stats = {"mean": mean.item(), "max": max_p.item(), "min": min_p.item(),
+                 "num_preds": num_unmasked, "mask": mask}
+        return res, stats
         # res contains 0 where masked, as useful dummy value for means
 
     def forward(self, x, get_attns=False, attn_requests=None,
