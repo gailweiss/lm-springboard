@@ -14,6 +14,7 @@ import itertools
 from copy import deepcopy
 from data.dataloader import datamodules_paths, LMDataModule
 from matplotlib.backends.backend_pdf import PdfPages
+import math
 
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
@@ -495,14 +496,25 @@ def _line_label(identifier, metric, identifiers, all_metric_names,
 
 def _plot(ax, x, y, s=0.5, plot_type="scatter",
           max_x=None, min_x=None, max_y=None, min_y=None,
-          extra_kwargs=None):
+          extra_kwargs=None, max_points_per_line=None):
+    
     def keep(vx, vy):
         return (vx < max_x) and (vx > min_x) and (vy < max_y) and (vy > min_y)
+    
     max_x = max_x if None is not max_x else torch.inf
     min_x = min_x if None is not min_x else -torch.inf
     max_y = max_y if None is not max_y else torch.inf
     min_y = min_y if None is not min_y else -torch.inf
     x, y = list(zip(*[(vx, vy) for vx, vy in zip(x, y) if keep(vx, vy)]))
+
+    if None is not max_points_per_line:
+        if len(x) > max_points_per_line:
+            jump = math.ceil(len(x) / max_points_per_line)
+            x = x[::jump]
+            y = y[::jump]
+            assert len(x) <= max_points_per_line
+            assert len(y) == len(x)
+
     extra_kwargs = {} if None is extra_kwargs else extra_kwargs
     if plot_type == "scatter":
         return ax.scatter(x, y, s=s, **extra_kwargs)
@@ -552,7 +564,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  max_x=None, min_x=None, max_y=None, min_y=None,
                  legend_markerscale=10, legend_outside=False,
                  add_to_pdf=None, close_at_end=False, verbose=True,
-                 skip_show=False):
+                 skip_show=False, max_points_per_line=None):
     # identifiers can be a dict giving the identifiers special names for
     # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name)
@@ -631,7 +643,8 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                 artists.append(
                     _plot(ax, x_vals, metric, plot_type=plot_type,
                           max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
-                          extra_kwargs=extra_kwargs))
+                          extra_kwargs=extra_kwargs,
+                          max_points_per_line=max_points_per_line))
 
     if legend_outside:
         extra_kwargs = {'loc': 'center left', 'bbox_to_anchor': (1, 0.5)}
