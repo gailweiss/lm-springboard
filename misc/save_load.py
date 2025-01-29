@@ -67,8 +67,8 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True):
         if None is pd:
             if verbose:
                 print("failed to load params:", pn, 
-                      "--they might be from a different branch. skipping")
-            return None
+                      "--they might be from a different branch.")
+            continue
         for k, v in asdict(pd).items():
             if isinstance(v, list):
                 # json turns tuples into lists, but saved configs (i.e.
