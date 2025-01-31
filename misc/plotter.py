@@ -88,8 +88,12 @@ def _plot(ax, x, y, s=0.5, plot_type="scatter",
 
 def get_aligned_vals(train_stats, metrics, verbose=True):
     def get_lists(m):
-        stat_syncer, n_train_samples, stat_counter, vals = \
-            list(zip(*train_stats[m]))
+        a = list(zip(*train_stats[m]))
+        if len(a) == 4:
+            stat_syncer, n_train_samples, stat_counter, vals = a
+        else:  # len(a) == 2, new version
+            stat_syncer, vals = a
+            stat_counter, n_train_samples = None, None
         return {"stat_syncer": stat_syncer, "n_train_samples": n_train_samples,
                 "stat_counter": stat_counter, "vals": vals}
     lists = {m: get_lists(m) for m in metrics}

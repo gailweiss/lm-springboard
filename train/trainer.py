@@ -18,7 +18,6 @@ class Trainer(pl.LightningModule):
         self.n_train_samples = 0
         self.n_train_batches = 0
         self.n_opt_steps = 0
-        self.stat_counter = -1
         self.logged_stats_dict = {}
         self.samples_at_validation = samples_at_validation
         # allows turning sampling off in specific cases,
@@ -36,9 +35,6 @@ class Trainer(pl.LightningModule):
         self.curr_epoch = -1
         self.val_count_in_epoch = -1
         self.train_dataloader_nbatches = train_dataloader_nbatches
-        self.log_stat("n_train_samples", self.n_train_samples)
-        self.log_stat("n_train_batches", self.n_train_batches)
-        self.log_stat("n_opt_steps", self.n_opt_steps)
 
     def prepare_saver(self, dp, saving_folder, saving_function):
         self.dp = dp
@@ -78,13 +74,7 @@ class Trainer(pl.LightningModule):
             wandb.log({name: val})
         if name not in self.logged_stats_dict:
             self.logged_stats_dict[name] = []
-        self.stat_counter += 1  # increases with every single stat,
-        # unlike stat syncer, which increases exactly once at the beginning
-        # of every training step
-        self.logged_stats_dict[name].append((self.stat_syncer,
-                                             self.n_train_samples,
-                                             self.stat_counter,
-                                             val))
+        self.logged_stats_dict[name].append((self.stat_syncer, val))
 
     def log_time(self):
         if None is not self.start_time:
