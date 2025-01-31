@@ -153,6 +153,8 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None, verbose=Fals
         info = get_info(identifier, verbose=verbose)
         if None is info:
             return []
+        if None is info["params"][paramset_name]:
+            return []
         d = vars(info["params"][paramset_name])
         return d.get(param_name, [])
         # [] is not a valid param value, for reasons outlined above
