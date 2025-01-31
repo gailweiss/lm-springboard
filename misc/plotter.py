@@ -1,10 +1,11 @@
 from misc.model_explorer import get_info, get_full_path, \
-    get_model_by_identifier, get_all_checkpoints_by_identifier
+    get_model_by_identifier, get_all_checkpoints_by_identifier, final_chkpt
 import math
 import matplotlib.pyplot as plt
 from misc.util import prepare_directory, print_nicely_nested
 from misc.util import printer_print as print
 from matplotlib.backends.backend_pdf import PdfPages
+import torch
 
 
 def _plt_title(title, metric_names, identifiers):
@@ -12,7 +13,8 @@ def _plt_title(title, metric_names, identifiers):
         return title
     single_identifier = len(identifiers) == 1
     if len(metric_names) == 1:
-        i = 0 if isinstance(metric_names, list) else metric_names.keys()[0]
+        i = 0 if isinstance(metric_names, list) else \
+            list(metric_names.keys())[0]
         return metric_names[i]
     if single_identifier and isinstance(identifiers, list):
         return get_info(
@@ -28,31 +30,32 @@ def _plt_title(title, metric_names, identifiers):
                     "please provide title for plot")
 
 
-def _line_label(identifier, metric, identifiers, all_metric_names,
-                ylabel, maybe_metric_nicknames):
-    if isinstance(identifiers, dict):
-        # identifiers have been given with labels for plot
-        ts_label = identifiers[identifier]
-    else:
-        t_info = get_info(identifier)
-        ts_label = t_info["params"]["data_params"].dataset_name
+def get_line_labeler(identifiers, all_metric_names, shared_ylabel):
+    def line_label(identifier, metric, maybe_metric_nicknames):
+        if isinstance(identifiers, dict):
+            # identifiers have been given with labels for plot
+            ts_label = identifiers[identifier]
+        else:
+            t_info = get_info(identifier)
+            ts_label = t_info["params"]["data_params"].dataset_name
 
-    if len(all_metric_names) == 1:
-        return ts_label
+        if len(all_metric_names) == 1:
+            return ts_label
 
-    if isinstance(maybe_metric_nicknames, dict):
-        metric_label = maybe_metric_nicknames[metric]
-    else:
-        metric_label = metric
-        if metric_label.startswith(ylabel):
-            metric_label = metric_label[len(ylabel):]
-        while metric_label.startswith("/") or metric_label.startswith("|"):
-            metric_label = metric_label[1:]
+        if isinstance(maybe_metric_nicknames, dict):
+            metric_label = maybe_metric_nicknames[metric]
+        else:
+            metric_label = metric
+            if metric_label.startswith(shared_ylabel):
+                metric_label = metric_label[len(shared_ylabel):]
+            while metric_label.startswith("/") or metric_label.startswith("|"):
+                metric_label = metric_label[1:]
 
-    if len(identifiers) == 1:
-        return metric_label
+        if len(identifiers) == 1:
+            return metric_label
 
-    return f"{ts_label}::{metric_label}"
+        return f"{ts_label}::{metric_label}"
+    return line_label
 
 
 def _plot(ax, x, y, s=0.5, plot_type="scatter",
@@ -83,39 +86,30 @@ def _plot(ax, x, y, s=0.5, plot_type="scatter",
         return ax.plot(x, y, **extra_kwargs)[0]
 
 
-def get_aligned_vals(train_stats, metric1, metric2, verbose=True):
-    d = train_stats[metric1]
-    # deprecating, no longer dealing with this:
-    # if len(d[0]) == 3:  # older version
-    #     n_train_samples, metric, stat_counter = list(zip(*d))    
-    stat_syncer1, n_train_samples1, stat_counter1, vals1 = \
-        list(zip(*train_stats[metric1]))
-    stat_syncer2, n_train_samples2, stat_counter2, vals2 = \
-        list(zip(*train_stats[metric2]))
-    if stat_syncer1 == stat_syncer2:
-        dropped_vals = (None, None)
-    else:
-        if verbose:
-            print("skipping records for alignment of", metric1, "with",
-                  metric2)
-        d1 = {s: v for s, v in zip(stat_syncer1, vals1)}
-        d2 = {s: v for s, v in zip(stat_syncer2, vals2)}
-        s1 = set(d1.keys())
-        s2 = set(d2.keys())
-        diff1 = s1.difference(s2)
-        diff2 = s2.difference(s1)
-        dropped_vals = (diff1, diff2)
-        shared = set(d1.keys()).intersection(set(d2.keys()))
-        paired_metrics = [(d1[s], d2[s]) for s in sorted(list(shared))]
-        vals1, vals2 = zip(*paired_metrics)
-        def dropped_set_str(s):
-            if len(s) < 10:
-                return str(s)
-            return f"[{len(s)} vals]"
-        dvss = list(map(dropped_set_str, dropped_vals))
-        if verbose:
-            print("skipped record points are (respectively):", dvss)
-    return vals1, vals2, dropped_vals
+def get_aligned_vals(train_stats, metrics, verbose=True):
+    def get_lists(m):
+        stat_syncer, n_train_samples, stat_counter, vals = \
+            list(zip(*train_stats[m]))
+        return {"stat_syncer": stat_syncer, "n_train_samples": n_train_samples,
+                "stat_counter": stat_counter, "vals": vals}
+    lists = {m: get_lists(m) for m in metrics}
+    dropped_syncs = {}
+    sync2vals = {m: {s: v for 
+                     s, v in zip(lists[m]["stat_syncer"], lists[m]["vals"])}
+                 for m in metrics}
+    syncs = set(sync2vals[metrics[0]])
+    for m in metrics[1:]:
+        syncs = syncs.intersection(set(sync2vals[m].keys()))
+    for m in metrics:
+        dropped_syncs[m] = set(sync2vals[m].keys()).difference(syncs)
+        if verbose and (len(dropped_syncs[m]) > 0):
+            print(f"skipping {len(dropped_syncs[m])} records for",
+                  f"alignment of {m} in {metrics}")
+            if len(dropped_syncs[m]) < 10:
+                print(f"(at syncs: {sorted(list(dropped_syncs[m]))})")
+    syncs = sorted(list(syncs))
+    aligned_vals = {m: [sync2vals[m][s] for s in syncs] for m in metrics}
+    return aligned_vals, dropped_syncs
 
 
 def _ylabel(metric_names):
@@ -123,7 +117,7 @@ def _ylabel(metric_names):
         return None
     if len(metric_names) == 1:
         if isinstance(metric_names, dict):
-            return metric_names[metric_names.keys()[0]]
+            return metric_names[list(metric_names.keys())[0]]
         else:
             return metric_names[0]
     if isinstance(metric_names, list):
@@ -143,18 +137,10 @@ def _longest_common_prefix(strings):
     return strings[0][:i+1]
 
 
-def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
-                 title=None, filename=None, colors=None,
-                 ylabel_ax1=None, ylabel_ax2=None, x_axis="n_train_samples",
-                 add_to=None, plot_type="scatter", stylist=None,
-                 max_x=None, min_x=None, max_y=None, min_y=None,
-                 legend_markerscale=10, legend_outside=False,
-                 add_to_pdf=None, close_at_end=False, verbose=True,
-                 skip_show=False, max_points_per_line=None):
-    # identifiers can be a dict giving the identifiers special names for
-    # the plot labels, or just an iterable with the identifiers of interest
-    # (in which case they will be labeled by their task name)
-
+def _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
+                        x_axis, title, stylist, ylabel_ax1, ylabel_ax2,
+                        add_to_plot, add_to_pdf):
+    
     if None is not add_to_pdf:
         assert isinstance(add_to_pdf, PdfPages)
         # create as: PdfPages(filename)
@@ -168,15 +154,14 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         metric_names_ax2 = [metric_names_ax2]
     if None is metric_names_ax2:
         metric_names_ax2 = []
-    assert [stylist, colors].count(None) >= 1
 
     if None is ylabel_ax1:
         ylabel_ax1 = _ylabel(metric_names_ax1)
     if None is ylabel_ax2:
         ylabel_ax2 = _ylabel(metric_names_ax2)
 
-    if None is not add_to:
-        fig, ax1, ax2, artists = add_to
+    if None is not add_to_plot:
+        fig, ax1, ax2, artists = add_to_plot
     else:
         fig, ax1 = plt.subplots()
         ax2 = None
@@ -201,49 +186,57 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
         names_as_list(metric_names_ax2)
     plt.title(_plt_title(title, all_metric_names, identifiers))
 
-    color_i = 0
-    dropped_vals = {i: {} for i in identifiers}
-    for ax, metric_names, ylabel in [(ax1, metric_names_ax1, ylabel_ax1),
-                                     (ax2, metric_names_ax2, ylabel_ax2)]:
-        if not ax:
-            continue
-        for i in identifiers:
-            for m in metric_names:
-                t_info = get_info(i, with_train_stats=True)
-                if m not in t_info["train_stats"]:
-                    continue  # eg if trying to show copy loss on several
-                    # identifiers but one is just pairs
-                metric, x_vals, dv = get_aligned_vals(
-                    t_info["train_stats"], m, x_axis, verbose=verbose)
-                dropped_vals[i][(m, x_axis)] = dv
-                extra_kwargs = stylist(i, m) if None is not stylist else {}
-                if "color" not in extra_kwargs and None is not colors:
-                    extra_kwargs["color"] = colors[color_i]
-                    color_i += 1
-                if "label" not in extra_kwargs:
-                    extra_kwargs["label"] = \
-                        _line_label(i, m, identifiers, all_metric_names,
-                                    shared_ylabel, metric_names)
-                if "marker" not in extra_kwargs:
-                    extra_kwargs["marker"] = "."
-                artists.append(
-                    _plot(ax, x_vals, metric, plot_type=plot_type,
-                          max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
-                          extra_kwargs=extra_kwargs,
-                          max_points_per_line=max_points_per_line))
+    amy = [(ax1, metric_names_ax1, ylabel_ax1),
+           (ax2, metric_names_ax2, ylabel_ax2)]
 
+    line_labeler = get_line_labeler(identifiers, all_metric_names, shared_ylabel)
+
+    return identifiers, amy, fig, ax1, ax2, artists, \
+           all_metric_names, line_labeler
+
+
+def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
+                  line_labeler, dropped_syncs_dict, verbose=True,
+                  plot_type="scatter", max_x=None, min_x=None, max_y=None,
+                  min_y=None, max_points_per_line=None):
+    t_info = get_info(identifier, with_train_stats=True)
+    if metric_name not in t_info["train_stats"]:
+        return  # can happen for example if trying to show copy loss on several
+        # identifiers but one is just pairs
+    aligned_vals, ds = get_aligned_vals(
+        t_info["train_stats"], [metric_name, x_axis], verbose=verbose)
+    metric, x_vals = aligned_vals[metric_name], aligned_vals[x_axis]
+    dropped_syncs_dict[identifier][(metric_name, x_axis)] = ds
+    extra_kwargs = stylist(identifier, metric_name) if None is not stylist \
+                   else {}
+    if "label" not in extra_kwargs:
+        extra_kwargs["label"] = line_labeler(identifier, metric_name,
+                                             metric_names)
+    if "marker" not in extra_kwargs:
+        extra_kwargs["marker"] = "."
+    return _plot(ax, x_vals, metric, plot_type=plot_type, max_x=max_x,
+                 min_x=min_x, max_y=max_y, min_y=min_y,
+                 extra_kwargs=extra_kwargs,
+                 max_points_per_line=max_points_per_line)
+
+
+def complete_plot(ax1, artists, legend_outside, legend_markerscale):
+    fig = plt.gcf()
     if legend_outside:
         extra_kwargs = {'loc': 'center left', 'bbox_to_anchor': (1, 0.5)}
     else:
         extra_kwargs = {}
     ax1.legend(artists, [a.get_label() for a in artists],
                markerscale=legend_markerscale, **extra_kwargs)
+    return fig
 
-    fig = plt.gcf()
+
+def show_and_save_plot(fig, identifiers, all_metric_names, dropped_syncs,
+                       skip_show, filename, add_to_pdf, close_at_end):
     if not skip_show:
         fig.show()
     if None is not filename:
-        fn = f"../metrics/{filename}"
+        fn = f"../plots/{filename}"
         directory = '/'.join(fn.split('/')[:-1])
         prepare_directory(directory)
         fig.savefig(f"{fn}.png", bbox_inches="tight")
@@ -254,18 +247,54 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
             print("identifier full paths:\n", file=f)
             for t in identifiers:
                 print(t, "\t:", get_full_path(t), "\n", file=f)
-            print("\n\nfor each id and metric, to take only points with",
+            print("\n\nfor each id and metric, to plot only points with",
                   "clear x axis value, dropped values at these stat-syncing",
-                  "positions: (format: #metric points dropped,",
-                  "#x-axis ({x_axis}) points dropped)\n", file=f)
-            print_nicely_nested(dropped_vals, file=f)
+                  "positions:\n", file=f)
+            print_nicely_nested(dropped_syncs, file=f)
 
     if None is not add_to_pdf:
         add_to_pdf.savefig(fig, bbox_inches="tight")
 
     if close_at_end:
         plt.close()
+
+
+def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
+                 title=None, filename=None, ylabel_ax1=None, ylabel_ax2=None,
+                 x_axis="n_train_samples", add_to_plot=None,
+                 plot_type="scatter", stylist=None, max_x=None, min_x=None,
+                 max_y=None, min_y=None, legend_markerscale=10,
+                 legend_outside=False, add_to_pdf=None, close_at_end=False,
+                 verbose=True, skip_show=False, max_points_per_line=None):
+    # identifiers can be a dict giving the identifiers special names for
+    # the plot labels, or just an iterable with the identifiers of interest
+    # (in which case they will be labeled by their task name). similarly
+    # metrics can be given as a dict giving them nicknames
+
+    setup = _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
+                                x_axis, title, stylist, ylabel_ax1, ylabel_ax2,
+                                add_to_plot, add_to_pdf)
+    identifiers, amy, fig, ax1, ax2, artists, all_metric_names = setup[:-1]
+    line_labeler = setup[-1]
+
+    dropped_syncs = {i: {} for i in identifiers}
+    for ax, metric_names, ylabel in amy:
+        if not ax:
+            continue
+        for i in identifiers:
+            for m in metric_names:
+                artists.append(_get_and_plot(
+                    ax, i, m, metric_names, x_axis, stylist, line_labeler,
+                    dropped_syncs, verbose=verbose, plot_type=plot_type,
+                    max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
+                    max_points_per_line=max_points_per_line))
+
+    fig = complete_plot(ax1, artists, legend_outside, legend_markerscale)
+    show_and_save_plot(fig, identifiers, all_metric_names, dropped_syncs,
+                       skip_show, filename, add_to_pdf, close_at_end)
+
     return fig, ax1, ax2, artists
+
 
 def show_lm_attns(identifier, x, layers=None, heads=None, store=False,
                   checkpoint=final_chkpt, cache=True):
