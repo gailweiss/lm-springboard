@@ -14,7 +14,6 @@ class Trainer(pl.LightningModule):
         self.train_params = train_params
         self.curr_train_stats_by_type = {"loss": {}, "acc": {}}
         self.curr_val_stats_by_type = {"loss": {}, "acc": {}}
-        self.this_lm_total_batches = 0
         self.start_time = start_time  # should be obtained with process_time()
         self.n_train_samples = 0
         self.n_train_batches = 0
@@ -187,15 +186,13 @@ class Trainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.stat_syncer += 1
         self.log_stat("stat_syncer", self.stat_syncer)
-        self.this_lm_total_batches += 1
-        self.n_train_batches += 1
         self.maybe_log_hyperparams_and_time()
         self.maybe_save_checkpoint()
         clear_gpu_caches()
 
         a = self.model.get_losses(batch, accs_too=True)
         losses, accs, n_samples = a["loss"], a["acc"], a["n_samples"]
-        self.n_train_samples += n_samples
+        
 
         for sn in ["loss", "acc"]:
             self.record_type_stats(a[sn], self.curr_train_stats_by_type[sn],
@@ -215,6 +212,10 @@ class Trainer(pl.LightningModule):
 
         self.manual_backward(losses["main"])
         self.maybe_step_opt_and_lr(batch_idx)
+        # update counters *after* logs, for more logical record:
+        # first loss is after 0 batches, not 1
+        self.n_train_batches += 1
+        self.n_train_samples += n_samples
 
     def maybe_step_opt_and_lr(self, batch_idx):
         if (batch_idx + 1) % self.train_params.accumulate_grad_batches == 0:
