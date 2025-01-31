@@ -364,7 +364,7 @@ def clear_chkpts_cache():
 info_cache = {}
 
 
-def get_info(identifier, with_train_stats=False, verbose=True):
+def get_info(identifier, with_train_stats=False, verbose=True, dont_cache=False):
     # always caches, info is generally small
     cache_id = (identifier, with_train_stats)
     if cache_id not in info_cache:
@@ -376,8 +376,11 @@ def get_info(identifier, with_train_stats=False, verbose=True):
             return None  # don't cache, in case file gets made/copied in soon
         res = load_model_info(path, with_train_stats=with_train_stats,
                               verbose=verbose)
-        info_cache[cache_id] = res
-    return info_cache[cache_id]
+        if not dont_cache:
+            info_cache[cache_id] = res
+    else:
+        res = info_cache[cache_id]
+    return res
 
 
 def verify_stable_load(identifier, checkpoint=final_chkpt):

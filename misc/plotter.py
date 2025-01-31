@@ -199,16 +199,31 @@ def _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
            all_metric_names, line_labeler
 
 
+def get_metrics(identifier, metrics, preloaded_metrics, no_caching):
+    if None is not preloaded_metrics:
+        if identifier in preloaded_metrics:
+            train_stats = preloaded_metrics[identifier]
+            if False not in [m in train_stats for m in metrics]:
+                return train_stats
+        print(f"loading train stats to get {metrics} for {identifier}")
+        print(f"identifier was present:",identifier in preloaded_metrics)
+        if identifier in preloaded_metrics:
+            print(f"only had metrics:",
+                  list(preloaded_metrics[identifier].keys()))
+    i = get_info(identifier, with_train_stats=True, dont_cache=no_caching)
+    return i["train_stats"]
+
 def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
                   line_labeler, dropped_syncs_dict, verbose=True,
                   plot_type="scatter", max_x=None, min_x=None, max_y=None,
-                  min_y=None, max_points_per_line=None):
-    t_info = get_info(identifier, with_train_stats=True)
-    if metric_name not in t_info["train_stats"]:
-        return  # can happen for example if trying to show copy loss on several
-        # identifiers but one is just pairs
+                  min_y=None, max_points_per_line=None, no_caching=False,
+                  preloaded_metrics=None):
+    train_stats = get_metrics(identifier, [metric_name, x_axis], preloaded_metrics,
+                         no_caching)
+    if metric_name not in train_stats:
+        return
     aligned_vals, ds = get_aligned_vals(
-        t_info["train_stats"], [metric_name, x_axis], verbose=verbose)
+        train_stats, [metric_name, x_axis], verbose=verbose)
     metric, x_vals = aligned_vals[metric_name], aligned_vals[x_axis]
     dropped_syncs_dict[identifier][(metric_name, x_axis)] = ds
     extra_kwargs = stylist(identifier, metric_name) if None is not stylist \
@@ -269,7 +284,8 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  plot_type="scatter", stylist=None, max_x=None, min_x=None,
                  max_y=None, min_y=None, legend_markerscale=10,
                  legend_outside=False, add_to_pdf=None, close_at_end=False,
-                 verbose=True, skip_show=False, max_points_per_line=None):
+                 verbose=True, skip_show=False, max_points_per_line=None,
+                 no_caching=False, preloaded_metrics=None):
     # identifiers can be a dict giving the identifiers special names for
     # the plot labels, or just an iterable with the identifiers of interest
     # (in which case they will be labeled by their task name). similarly
@@ -291,7 +307,9 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                     ax, i, m, metric_names, x_axis, stylist, line_labeler,
                     dropped_syncs, verbose=verbose, plot_type=plot_type,
                     max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
-                    max_points_per_line=max_points_per_line))
+                    max_points_per_line=max_points_per_line,
+                    no_caching=no_caching,
+                    preloaded_metrics=preloaded_metrics))
 
     fig = complete_plot(ax1, artists, legend_outside, legend_markerscale)
     show_and_save_plot(fig, identifiers, all_metric_names, dropped_syncs,
