@@ -165,7 +165,8 @@ def _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
         ylabel_ax2 = _ylabel(metric_names_ax2)
 
     if None is not add_to_plot:
-        fig, ax1, ax2, artists = add_to_plot
+        fig, ax1, ax2, artists = [add_to_plot[n] for n in 
+                                  ["fig", "ax1", "ax2", "artists"]]
     else:
         fig, ax1 = plt.subplots()
         ax2 = None
@@ -315,7 +316,8 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
     show_and_save_plot(fig, identifiers, all_metric_names, dropped_syncs,
                        skip_show, filename, add_to_pdf, close_at_end)
 
-    return fig, ax1, ax2, artists
+    res = {"fig": fig, "ax1": ax1, "ax2": ax2, "artists": artists}
+    return res
 
 
 def show_lm_attns(identifier, x, layers=None, heads=None, store=False,
