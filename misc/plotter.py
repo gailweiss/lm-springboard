@@ -164,22 +164,22 @@ def _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
     if None is ylabel_ax2:
         ylabel_ax2 = _ylabel(metric_names_ax2)
 
-    if None is not add_to_plot:
-        fig, ax1, ax2, artists = [add_to_plot[n] for n in 
-                                  ["fig", "ax1", "ax2", "artists"]]
-    else:
-        fig, ax1 = plt.subplots()
-        ax2 = None
-        artists = []
+    plot = add_to_plot
+    if None is plot:
+        plot = {}
+        plot["fig"], plot["ax1"] = plt.subplots()
+        plot["ax2"] = None
+        plot["artists"] = []
+        plot["last_val"] = {}
 
-    if metric_names_ax2 and (None is ax2):
-        ax2 = ax1.twinx()
+    if metric_names_ax2 and (None is plot["ax2"]):
+        plot["ax2"] = plot["ax1"].twinx()
 
-    ax1.set_xlabel(x_axis)
-    ax1.set_ylabel(ylabel_ax1)
+    plot["ax1"].set_xlabel(x_axis)
+    plot["ax1"].set_ylabel(ylabel_ax1)
 
-    if None is not ax2:
-        ax2.set_ylabel(ylabel_ax2)
+    if None is not plot["ax2"]:
+        plot["ax2"].set_ylabel(ylabel_ax2)
         shared_ylabel = _longest_common_prefix([ylabel_ax1, ylabel_ax2])
     else:
         shared_ylabel = ylabel_ax1
@@ -187,17 +187,17 @@ def _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
     def names_as_list(names_or_dict):
         return names_or_dict if isinstance(names_or_dict, list) else \
             list(names_or_dict.keys())
+
     all_metric_names = names_as_list(metric_names_ax1) + \
         names_as_list(metric_names_ax2)
     plt.title(_plt_title(title, all_metric_names, identifiers))
 
-    amy = [(ax1, metric_names_ax1, ylabel_ax1),
-           (ax2, metric_names_ax2, ylabel_ax2)]
+    amy = [(plot["ax1"], metric_names_ax1, ylabel_ax1),
+           (plot["ax2"], metric_names_ax2, ylabel_ax2)]
 
     line_labeler = get_line_labeler(identifiers, all_metric_names, shared_ylabel)
 
-    return identifiers, amy, fig, ax1, ax2, artists, \
-           all_metric_names, line_labeler
+    return identifiers, amy, plot, all_metric_names, line_labeler
 
 
 def get_metrics(identifier, metrics, preloaded_metrics, no_caching):
@@ -218,7 +218,7 @@ def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
                   line_labeler, dropped_syncs_dict, verbose=True,
                   plot_type="scatter", max_x=None, min_x=None, max_y=None,
                   min_y=None, max_points_per_line=None, no_caching=False,
-                  preloaded_metrics=None):
+                  preloaded_metrics=None, last_vals=None):
     train_stats = get_metrics(identifier, [metric_name, x_axis], preloaded_metrics,
                          no_caching)
     if metric_name not in train_stats:
@@ -234,6 +234,10 @@ def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
                                              metric_names)
     if "marker" not in extra_kwargs:
         extra_kwargs["marker"] = "."
+    if None is not last_vals:
+        label = extra_kwargs["label"]
+        assert label not in last_vals
+        last_vals[label] = (x_vals[-1], metric[-1])
     return _plot(ax, x_vals, metric, plot_type=plot_type, max_x=max_x,
                  min_x=min_x, max_y=max_y, min_y=min_y,
                  extra_kwargs=extra_kwargs,
@@ -295,8 +299,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
     setup = _plot_metrics_setup(identifiers, metric_names_ax1, metric_names_ax2,
                                 x_axis, title, stylist, ylabel_ax1, ylabel_ax2,
                                 add_to_plot, add_to_pdf)
-    identifiers, amy, fig, ax1, ax2, artists, all_metric_names = setup[:-1]
-    line_labeler = setup[-1]
+    identifiers, amy, plot, all_metric_names, line_labeler = setup
 
     dropped_syncs = {i: {} for i in identifiers}
     for ax, metric_names, ylabel in amy:
@@ -304,20 +307,19 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
             continue
         for i in identifiers:
             for m in metric_names:
-                artists.append(_get_and_plot(
+                plot["artists"].append(_get_and_plot(
                     ax, i, m, metric_names, x_axis, stylist, line_labeler,
                     dropped_syncs, verbose=verbose, plot_type=plot_type,
                     max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
                     max_points_per_line=max_points_per_line,
-                    no_caching=no_caching,
+                    no_caching=no_caching, last_vals=plot["last_val"],
                     preloaded_metrics=preloaded_metrics))
 
-    fig = complete_plot(ax1, artists, legend_outside, legend_markerscale)
-    show_and_save_plot(fig, identifiers, all_metric_names, dropped_syncs,
+    plot["fig"] = complete_plot(plot["ax1"], plot["artists"], legend_outside, legend_markerscale)
+    show_and_save_plot(plot["fig"], identifiers, all_metric_names, dropped_syncs,
                        skip_show, filename, add_to_pdf, close_at_end)
 
-    res = {"fig": fig, "ax1": ax1, "ax2": ax2, "artists": artists}
-    return res
+    return plot
 
 
 def show_lm_attns(identifier, x, layers=None, heads=None, store=False,
