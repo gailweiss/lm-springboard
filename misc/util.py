@@ -265,3 +265,22 @@ def apply_dataclass(dataclass, given_attrs, forgiving=False,
     if takes_extras:
         [setattr(res, n, v) for n, v in extra_attrs.items()]
     return res
+
+
+def same_dict_structure(d1, d2, verbose=False, pref=""):
+    are_dicts = [isinstance(d1, dict), isinstance(d2, dict)]
+    if are_dicts == [False, False]:
+        return True
+    if False in are_dicts:
+        print(f"d1 dict: {are_dicts[0]} but d2 dict: {are_dicts[1]}")
+        return False
+    if d1.keys() != d2.keys():
+        if verbose:
+            print(pref, "different keys:", list(dl.keys()),
+                  "vs", list(d2.keys()))
+        return False
+    for k in d1.keys():
+        if not same_dict_structure(d1[k], d2[k], verbose=verbose,
+                                   pref=pref + f"in {k}\n"):
+            return False
+    return True

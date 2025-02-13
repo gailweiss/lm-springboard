@@ -3,7 +3,7 @@ from misc.save_load import load_model, load_model_info, final_chkpt, \
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from misc.util import glob_nosquares, pad
+from misc.util import glob_nosquares, pad, same_dict_structure
 import sys
 from os.path import join as path_join
 from misc.util import printer_print as print
@@ -170,38 +170,34 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None, verbose=Fals
     return res
 
 
-def print_config_compare(identifiers, print_padding=30, file=sys.stdout,
-                         just_list_differing_keys=False):
-    ids_with_missing_paramsets = \
-        set([i for i in identifiers if None in get_info(i).values()])
-    if ids_with_missing_paramsets:
+def ids_with_missing_paramsets(identifiers, verbose=False):
+    res = set([i for i in identifiers if None in get_info(i).values()])
+    if res and verbose:
         print("following ids have a missing paramset:", file=file)
-        for i in sorted(list(ids_with_missing_paramsets)):
+        for i in sorted(list(res)):
             missing_sets = [psn for psn in get_info(i) if
                             None is get_info(i)[psn]]
             print(f"\n{i}, missing: {missing_sets}. path: {get_full_path(i)}",
                   file=file)
         print("==\n\n", file=file)
+    return res
+
+
+def get_configs_values(identifiers, verbose=False):
+    if ids_with_missing_paramsets(identifiers, verbose=verbose):
+        return -1
 
     def params_dicts(model_info):
         return {k: vars(v) for k, v in model_info["params"].items()}
-    infos = [(i, params_dicts(get_info(i))) for i in identifiers if
-             i not in ids_with_missing_paramsets]
+
+    infos = [(i, params_dicts(get_info(i))) for i in identifiers]
 
     # check all infos have same structure before reaching weird conclusions
     example_id, example_info = infos[0]
     for i, info in infos:
-        if set(example_info.keys()) != set(info.keys()):
-            print("in ids:", example_id, "vs", i, ",", file=file)
-            print("have different structures, cant proceed:",
-                  example_info.keys(), "vs", info.keys(), file=file)
+        if not same_dict_structure(example_info, info, verbose=verbose,
+                                   pref=f"in ids {example_id} vs {i}"):
             return -1
-        for k in example_info:
-            if set(example_info[k].keys()) != set(info[k].keys()):
-                print("in ids:", example_id, "vs", i, ",", file=file)
-                print(f"have different structures in {k}, cant proceed:",
-                      example_info[k].keys(), "vs", info[k].keys(), file=file)
-                return -1
 
     all_vals = deepcopy(example_info)
     for k1 in all_vals:
@@ -209,6 +205,16 @@ def print_config_compare(identifiers, print_padding=30, file=sys.stdout,
             all_vals[k1][k2] = set([all_vals[k1][k2]])
             for i, info in infos[1:]:
                 all_vals[k1][k2].add(info[k1][k2])
+    return all_vals
+
+
+def print_config_compare(identifiers, print_padding=30, file=sys.stdout,
+                         just_list_differing_keys=False):
+    
+    all_vals = get_configs_values(identifiers, verbose=True)
+    if not isinstance(all_vals, dict):
+        print("could not get config value sets for these identifiers")
+        return all_vals
 
     padline = "="*40 + "\n"
 
@@ -420,14 +426,6 @@ def verify_stable_load(identifier, checkpoint=final_chkpt):
     assert torch.equal(m1([[1, 2]])["logits"], m2([[1, 2]])["logits"]), msg
 
     print("passed basic load checks")
-
-
-
-
-
-
-
-
 
 
 def compute_validation(lm, dataset, params, sample=True):
