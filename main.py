@@ -72,7 +72,8 @@ class Namer:
     def wandb_proj_name(self):
         specific = self.args.config if None is self.args.wandb_proj_name \
                     else self.args.wandb_proj_name
-        return f"{MAIN_PROJ}-{specific}-{self.dp.dataset_name}"
+        res = f"{MAIN_PROJ}-{specific}-{self.dp.dataset_name}"
+        return res.replace("/","-")  # wandb projects cant have / in name
 
     def run_name(self):
         model_str = f"L:[{self.mp.n_layers}]-D:[{self.mp.dim}]" +\
