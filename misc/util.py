@@ -284,3 +284,14 @@ def same_dict_structure(d1, d2, verbose=False, pref=""):
                                    pref=pref + f"in {k}\n"):
             return False
     return True
+
+def apply_dict_to_np_array(np_array, d):
+    # e.g. for np_array = [1,1,2,3] and d = {1:4, 2:2, 3:5},
+    # will return [4,4,2,5]
+    k, v = list(zip(*d.items()))
+    k = np.array(k)
+    v = np.array(v)
+
+    mapping_ar = np.zeros(k.max()+1,dtype=v.dtype) #k,v from approach #1
+    mapping_ar[k] = v
+    return mapping_ar[np_array]
