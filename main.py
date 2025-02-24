@@ -248,7 +248,16 @@ def run_config(args, dp, tp, mp, namer):
     print_nicely_nested(full_params)
     lm, dataset = setup_model_and_data(dp, mp, tp,
                                        keep_datamodule=args.keep_datamodule)
-
+    dp = dataset.data_params
+    # accurately reflect the data params of the dataset that was selected
+    # and used, even if these are not exactly equivalent to what was requested
+    # (a: on load, dataset adds some meta information to its parameters, such as
+    #  its total size, so want access to that, and b: some params are not
+    #  important, e.g. which n-grams the dataset has analysed when training
+    #  without tracking these). will make more informative saved model folders
+    # the original requested dp will still be available through
+    # full_params, which is built at the top of this function and printed to
+    # the log (above here: "print_nicely_nested(full_params)")
     pltrainer = train(args, lm, dataset, tp, dp, saving_folder)
     show_sample(pltrainer.model.model)
     save_model(args, saving_folder, pltrainer, dp, tp)
