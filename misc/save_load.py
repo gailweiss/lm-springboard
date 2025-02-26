@@ -13,6 +13,7 @@ from data.data_params import make_dp
 import glob
 from misc.util import printer_print as print
 from dataclasses import asdict
+import torch
 
 
 try:
@@ -152,6 +153,15 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
         train_params=res["params"]["train_params"])
 
     res["lm"] = model_trainer.model  # in case it makes a copy or something
+
+    # move model to gpu before returning, else everything will
+    # be done on cpu for no reason
+    if torch.cuda.is_available():
+        res["lm"].cuda()
+    if torch.backends.mps.is_available():
+        mps_device = torch.device("mps")
+        res["lm"].to(mps_device)
+
     res["lm"].eval()
 
     return res
