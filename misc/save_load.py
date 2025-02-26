@@ -46,6 +46,10 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
         # all configs to have only tuples if they have iterables at all,
         # so the dataclass loading function successfully reverts this
     with open(path_join(folder_name, "train_stats.json"), "w") as f:
+        my_trainer.logged_stats_dict["total_train_samples"] = \
+            my_trainer.n_train_samples  # this will be slightly more than
+            # the last value in the stats_dict["train_samples"] log, as that
+            # will have been logged just *before* the last batch was trained on
         json.dump(my_trainer.logged_stats_dict, f)
     if not just_stats:
         pl_trainer.model.model.tokenizer.save(folder_name)
@@ -79,8 +83,10 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True):
     if with_train_stats:
         with open(path_join(folder_name, "train_stats.json"), "r") as f:
             res["train_stats"] = json.load(f)
-            res["train_stats"]["total_train_samples"] = \
-                res["train_stats"].get("n_train_samples", [[0]])[-1][0]
+            if "total_train_samples" not in res["train_stats"]:
+                res["train_stats"]["total_train_samples"] = \
+                    res["train_stats"].get("n_train_samples", [[0]])[-1][-1] +\
+                    res["params"]["train_params"].batch_size
             # if not got, this is the model at time 0 (no training yet)
 
     return res
