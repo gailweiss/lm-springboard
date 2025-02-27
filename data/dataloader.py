@@ -138,6 +138,12 @@ class ForTorchDataSet:
         self.lengths = lengths
         self.indices = torch.as_tensor(indices)
 
+    def total_tokens(self):
+        return sum(self.lengths).item()
+
+    def as_indices_list(self):
+        return [s.tolist()[:l] for s, l in zip(self.indices, self.lengths)]
+
     def __getitem__(self, i):
         return self.lengths[i], self.indices[i]
 
@@ -231,11 +237,12 @@ class LMDataModule(pl.LightningDataModule):
     def save_to_folder(self, path):
         prepare_directory(path)
         # save tokenizer, save self
+        self.from_path = path
         self.tokenizer.save(path)
         base_attr_names = ["train_n", "test_n", "val_n"]
-        base_attrs = {n: getattr(self, n) for n in base_attr_names}
+        notes = {n: getattr(self, n) for n in base_attr_names}
         with open(path_join(path, f"dataloader_notes.json"), "w") as f:
-            json.dump(base_attrs, f)
+            json.dump(notes, f)
         with open(path_join(path, f"model_params.json"), "w") as f:
             json.dump(vars(self.model_params), f)
         with open(path_join(path, f"data_params.json"), "w") as f:
@@ -244,8 +251,12 @@ class LMDataModule(pl.LightningDataModule):
         for sn in ["train_samples", "test_samples", "val_samples"]:
             ds = getattr(self, sn)
             for a in ["lengths", "indices"]:
-                np.save(path_join(path, f"{sn}-{a}.npy"), getattr(ds, a),
-                        allow_pickle=False)
+                v = getattr(ds, a)
+                if isinstance(v, torch.Tensor):
+                    v = v.cpu()  # else numpy wont save
+                if None is not v:
+                    np.save(path_join(path, f"{sn}-{a}.npy"), v, 
+                            allow_pickle=False)
 
     def setup_from_data_dict(self, samples):
         train_samples = samples["train"]
@@ -472,7 +483,7 @@ def mycollate(b):
     dtype = torch.long
     lengths = [s[0] for s in b]
     seqlen = max(lengths)
-
+    device = example_indices.device
     batch_indices = torch.zeros((len(b), seqlen), dtype=dtype)
 
     with_mask = len(set(lengths)) > 1
@@ -482,10 +493,12 @@ def mycollate(b):
         batch_indices[i] = seq[:seqlen]
         if with_mask:
             mask[i][:n] = 0
-
+        
     # indices shape: batch size X seq len.
     # values past an individual sequence's length are filled with the
     # tokenizer's pad_token_id
     # mask shape: batch size X seq len, or None. marks pads.
     # mask is 0 where the sequence is active and 1 where it is off (padded)
-    return {"x_indices": batch_indices, "mask": mask}
+    if None is not mask:
+        mask = mask.to(device=device)
+    return {"x_indices": batch_indices.to(device=device), "mask": mask}
