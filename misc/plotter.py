@@ -236,7 +236,7 @@ def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
         extra_kwargs["marker"] = "."
     if None is not last_vals:
         label = extra_kwargs["label"]
-        assert label not in last_vals
+        assert label not in last_vals, (label, last_vals)
         last_vals[label] = (x_vals[-1], metric[-1])
     return _plot(ax, x_vals, metric, plot_type=plot_type, max_x=max_x,
                  min_x=min_x, max_y=max_y, min_y=min_y,
