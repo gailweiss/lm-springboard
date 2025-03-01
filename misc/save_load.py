@@ -2,7 +2,7 @@ import json
 from misc.util import prepare_directory
 from misc.gpt2 import get_gpt2
 from pathlib import Path
-from os.path import join as path_join
+import os.path as path
 from misc.create import make_model, make_datamodule
 from train.trainer import Trainer
 from train.train_params import make_tp
@@ -40,12 +40,12 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
     for p, n in [(model_params, "model_params"),
                  (data_params, "data_params"),
                  (train_params, "train_params")]:
-        with open(path_join(folder_name, f"{n}.json"), "w") as f:
+        with open(path.join(folder_name, f"{n}.json"), "w") as f:
             json.dump(vars(p), f)
         # json will turn tuples into lists, which is annoying. but i expect
         # all configs to have only tuples if they have iterables at all,
         # so the dataclass loading function successfully reverts this
-    with open(path_join(folder_name, "train_stats.json"), "w") as f:
+    with open(path.join(folder_name, "train_stats.json"), "w") as f:
         my_trainer.logged_stats_dict["total_train_samples"] = \
             my_trainer.n_train_samples  # this will be slightly more than
             # the last value in the stats_dict["train_samples"] log, as that
@@ -53,20 +53,66 @@ def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
         json.dump(my_trainer.logged_stats_dict, f)
     if not just_stats:
         pl_trainer.model.model.tokenizer.save(folder_name)
-        pl_trainer.save_checkpoint(path_join(folder_name, "model.model"))
+        pl_trainer.save_checkpoint(path.join(folder_name, "model.model"))
 
 
-def load_model_info(folder_name, with_train_stats=False, verbose=True):
+def get_train_stats(folder_name, get_lite=True, store_lite=True,
+                    batch_size=None):
+    # need batch_size so long as still fixing older runs, eventually remove it
+    def is_lite_key(k):
+        for n in ["||max/", "||min/"]:
+            if n in k:
+                return False
+        for n in ["-max", "-min"]:
+            if k.endswith(n):
+                return False
+        if k in ["stat_syncer", "n_active_params", "avg_lr", "n_epochs"]:
+            return False
+        return True
+
+    lite_file = path.join(folder_name, "train_stats_lite.json")
+    main_file = path.join(folder_name, "train_stats.json")
+
+    if get_lite:
+        if path.exists(lite_file):
+            with open(lite_file, "r") as f:
+                return json.load(f)
+            # no fixes needed to add total_train_samples to lite train_stats -
+            # they will all be created from fixed loaded train_stats
+        # else:
+        ts = get_train_stats(folder_name, get_lite=False)
+        ts = {k: v for k, v in ts.items() if is_lite_key(k)}
+        if store_lite:
+            with open(lite_file, "w") as f:
+                json.dump(ts, f)
+        return ts
+    # else:
+    with open(path.join(folder_name, "train_stats.json"), "r") as f:
+        ts = json.load(f)
+        if "total_train_samples" not in ts:
+            if batch_size <= 0:
+                "batch size uknown - total_train_samples inferred incorrectly"
+            ts["total_train_samples"] = \
+                ts.get("n_train_samples", [[0]])[-1][-1] + batch_size
+        # if not got, this is the model at time 0 (no training yet)
+        return ts
+
+
+def load_model_info(folder_name, with_train_stats=False, verbose=True,
+                    get_lite=True, store_lite=True):
     if not Path(folder_name).exists():
         raise ValueError(f"Folder {folder_name} does not exist")
 
     res = {"params": {}}
-    with open(path_join(folder_name, "model_params.json"), "r") as f:
-        res["params"]["model_params"] = make_mp(verbose=verbose, **json.load(f))
-    with open(path_join(folder_name, "data_params.json"), "r") as f:
-        res["params"]["data_params"] = make_dp(verbose=verbose, **json.load(f))
-    with open(path_join(folder_name, "train_params.json"), "r") as f:
-        res["params"]["train_params"] = make_tp(verbose=verbose, **json.load(f))
+    with open(path.join(folder_name, "model_params.json"), "r") as f:
+        res["params"]["model_params"] = make_mp(verbose=verbose,
+                                                **json.load(f))
+    with open(path.join(folder_name, "data_params.json"), "r") as f:
+        res["params"]["data_params"] = make_dp(verbose=verbose,
+                                               **json.load(f))
+    with open(path.join(folder_name, "train_params.json"), "r") as f:
+        res["params"]["train_params"] = make_tp(verbose=verbose,
+                                                **json.load(f))
 
     for pn, pd in res["params"].items():
         if None is pd:
@@ -81,14 +127,11 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True):
                 setattr(pd, k, tuple(v))
 
     if with_train_stats:
-        with open(path_join(folder_name, "train_stats.json"), "r") as f:
-            res["train_stats"] = json.load(f)
-            if "total_train_samples" not in res["train_stats"]:
-                res["train_stats"]["total_train_samples"] = \
-                    res["train_stats"].get("n_train_samples", [[0]])[-1][-1] +\
-                    res["params"]["train_params"].batch_size
-            # if not got, this is the model at time 0 (no training yet)
-
+        batch_size = res["params"]["train_params"].batch_size if \
+                     None is not res["params"]["train_params"] else -1
+        res["train_stats"] = get_train_stats(folder_name, get_lite=get_lite,
+                                             store_lite=store_lite,
+                                             batch_size=batch_size)
     return res
 
 
@@ -155,7 +198,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
     # fill model with saved params. don't know if this will affect the
     # passed in parameter lm, so will get it explicitly back from the trainer
     model_trainer = Trainer.load_from_checkpoint(
-        path_join(folder_name, "model.model"), model=res["lm"],
+        path.join(folder_name, "model.model"), model=res["lm"],
         train_params=res["params"]["train_params"])
 
     res["lm"] = model_trainer.model  # in case it makes a copy or something

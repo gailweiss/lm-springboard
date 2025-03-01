@@ -370,18 +370,21 @@ def clear_chkpts_cache():
 info_cache = {}
 
 
-def get_info(identifier, with_train_stats=False, verbose=True, dont_cache=False):
+def get_info(identifier, with_train_stats=False, verbose=True,
+             dont_cache=False, get_lite=True, store_lite=True):
     # always caches, info is generally small
-    cache_id = (identifier, with_train_stats)
+    cache_id = (identifier, with_train_stats, get_lite, store_lite)
     if cache_id not in info_cache:
-        path = get_full_path(identifier, checkpoint=final_chkpt, verbose=verbose)
+        path = get_full_path(identifier, checkpoint=final_chkpt,
+                             verbose=verbose)
         if None is path:
             if verbose:
                 print("could not get final checkpoint path for identifier:",
                       identifier)
             return None  # don't cache, in case file gets made/copied in soon
         res = load_model_info(path, with_train_stats=with_train_stats,
-                              verbose=verbose)
+                              verbose=verbose, get_lite=get_lite,
+                              store_lite=True)
         if not dont_cache:
             info_cache[cache_id] = res
     else:
