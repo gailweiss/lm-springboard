@@ -295,3 +295,23 @@ def apply_dict_to_np_array(np_array, d):
     mapping_ar = np.zeros(k.max()+1,dtype=v.dtype) #k,v from approach #1
     mapping_ar[k] = v
     return mapping_ar[np_array]
+
+
+def gpu_version(tensor):
+    if tensor.get_device() == -1:  # on cpu
+        if torch.cuda.is_available():
+            return tensor.cuda()
+        if torch.backends.mps.is_available():
+            mps_device = torch.device("mps")
+            return tensor.to(mps_device)
+        print("failed to convert tensor on device", tensor.device)
+    return tensor
+
+
+def convert_all_nested_lists_to_tuples(iterable):
+    if isinstance(iterable, tuple) or isinstance(iterable, list):
+        return tuple(convert_all_nested_lists_to_tuples(v) for v in iterable)
+    if isinstance(iterable, dict):
+        return {k: convert_all_nested_lists_to_tuples(v) for k, v in
+                iterable.items()}
+    return iterable

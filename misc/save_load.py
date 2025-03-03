@@ -1,5 +1,5 @@
 import json
-from misc.util import prepare_directory
+from misc.util import prepare_directory, convert_all_nested_lists_to_tuples
 from misc.gpt2 import get_gpt2
 from pathlib import Path
 import os.path as path
@@ -104,6 +104,7 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True,
         raise ValueError(f"Folder {folder_name} does not exist")
 
     res = {"params": {}}
+
     with open(path.join(folder_name, "model_params.json"), "r") as f:
         res["params"]["model_params"] = make_mp(verbose=verbose,
                                                 **json.load(f))
@@ -121,10 +122,10 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True,
                       "--they might be from a different branch.")
             continue
         for k, v in asdict(pd).items():
-            if isinstance(v, list):
-                # json turns tuples into lists, but saved configs (i.e.
-                # true configs, not config 'lists') don't have lists: correct
-                setattr(pd, k, tuple(v))
+            setattr(pd, k, convert_all_nested_lists_to_tuples(v))
+            # json turns tuples into lists, but saved configs (i.e. true
+            # configs, not config 'lists') don't have lists - 
+            # correct back to tuples
 
     if with_train_stats:
         batch_size = res["params"]["train_params"].batch_size if \
@@ -137,6 +138,7 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True,
 
 def get_datamodule(data_params, model_params, verbose=True,
                    keep_datamodule=False, given_tokenizer=None):
+    
     data = get_existing_datamodule(data_params, model_params)
     if None is not data:
         return data
