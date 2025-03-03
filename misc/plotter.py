@@ -288,7 +288,7 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
                  x_axis="n_train_samples", add_to_plot=None,
                  plot_type="scatter", stylist=None, max_x=None, min_x=None,
                  max_y=None, min_y=None, legend_markerscale=10,
-                 legend_outside=False, add_to_pdf=None, close_at_end=False,
+                 legend_outside=False, add_to_pdf=None, close_at_end=True,
                  verbose=True, skip_show=False, max_points_per_line=None,
                  no_caching=False, preloaded_metrics=None):
     # identifiers can be a dict giving the identifiers special names for
