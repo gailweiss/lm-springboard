@@ -484,7 +484,16 @@ def mycollate(b):
     lengths = [s[0] for s in b]
     seqlen = max(lengths)
     device = example_indices.device
-    batch_indices = torch.zeros((len(b), seqlen), dtype=dtype)
+    batch_indices = torch.zeros((len(b), seqlen), dtype=dtype, device=device)
+    # nasty nasty bug i dont understand makes the assignment into values in a
+    # special branch go very wrong (massive (overflow?) values in row 1, and
+    # then all zeros onward) if the zeros are not moved to the expected device
+    # beforehand.
+    # I am not able to reproduce the bug outside of this setting, so it must
+    # also be something about how the values end up here - how they're gathered
+    # by torch dataloaders before reaching batch collate.
+    # this solves it, and i'm tired of tracking down what it is and just want
+    # to not have it
 
     with_mask = len(set(lengths)) > 1
     mask = torch.ones(batch_indices.shape, dtype=dtype) if with_mask else None
