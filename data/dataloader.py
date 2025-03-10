@@ -79,60 +79,6 @@ def get_data(data_params):
     return samples
 
 
-def get_existing_datamodule(data_params, model_params):
-    def is_match(dpd, mpd):
-        # all the attrs that determine the dataset and the tokenizer
-        important_model_attrs = ["max_seq_len", "tokenizer_source_name"]
-        important_data_attrs = ["dataset_name", "debug_crop",
-                                "breaking_synthetic_samples_ok",
-                                "val_pct", "test_pct", "lines_per_sample",
-                                "max_seq_len"]
-        for a in important_data_attrs:
-            if not dpd[a] == getattr(data_params, a):
-                print("mismatch on data attr:", a)
-                return False
-        for a in important_model_attrs:
-            if not mpd[a] == getattr(model_params, a):
-                print("mismatch on model attr:", a)
-                return False
-        if model_params.tokenizer_source_name == "custom":
-            if not (mpd["custom_tokenizer_ntokens"] ==
-                    model_params.custom_tokenizer_ntokens):
-                print("mismatch on number of tokens")
-                return False
-        def same_keys(d,p):
-            return sorted(list(d.keys())) == sorted(list(vars(p).keys()))
-        if not same_keys(dpd, data_params):
-            print("mismatch on data attributes---different branch or commit")
-            return False
-        # model staying the same not really important so long as the
-        # data-relevant attributes (tokenizer, sequence length) are fine
-        # if not same_keys(mpd, model_params):
-        #     print("mismatch on model attributes---different branch or commit")
-        #     return False
-        return True
-
-    print("checking for existing datamodule")
-    for p in datamodules_paths:
-        print("checking inside path:", p)
-        print("path contains:", glob_nosquares(f"{p}/*"))
-        with_identifiers = glob_nosquares(f"{p}/{data_params.dataset_name}/*")
-        for path in with_identifiers:
-            print("checking path:", path)
-            with open(path_join(path, "model_params.json"), "r") as f:
-                mpd = json.load(f)
-            with open(path_join(path, "data_params.json"), "r") as f:
-                dpd = json.load(f)
-            with open(path_join(path, f"dataloader_notes.json"), "r") as f:
-                notes = json.load(f)
-
-            if is_match(dpd, mpd):
-                print("matched!")
-                return LMDataModule(None, None, None, None, from_folder=path)
-    print("no match!")
-    return None
-
-
 class ForTorchDataSet:
     def __init__(self, lengths, indices):
         self.lengths = lengths

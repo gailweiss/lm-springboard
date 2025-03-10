@@ -8,7 +8,6 @@ from train.trainer import Trainer
 from train.train_params import make_tp
 from model.model_params import make_mp
 from model.tokenizer import load_stored_tokenizer_if_exists
-from data.dataloader import get_existing_datamodule
 from data.data_params import make_dp
 import glob
 from misc.util import printer_print as print
@@ -139,7 +138,8 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True,
 def get_datamodule(data_params, model_params, verbose=True,
                    keep_datamodule=False, given_tokenizer=None):
     
-    data = get_existing_datamodule(data_params, model_params)
+    from misc.model_explorer import find_existing_datamodule
+    data = find_existing_datamodule(data_params, model_params)
     if None is not data:
         return data
 
