@@ -337,11 +337,13 @@ class LMDataModule(pl.LightningDataModule):
         return self.generic_loader(self.train_samples, batch_size,
                                    shuffle=shuffle)
 
-    def val_dataloader(self, batch_size):
-        return self.generic_loader(self.val_samples, batch_size)
+    def val_dataloader(self, batch_size, shuffle=False):
+        return self.generic_loader(self.val_samples, batch_size,
+                                   shuffle=shuffle)
 
-    def test_dataloader(self, batch_size):
-        return self.generic_loader(self.test_samples, batch_size)
+    def test_dataloader(self, batch_size, shuffle=False):
+        return self.generic_loader(self.test_samples, batch_size,
+                                   shuffle=shuffle)
 
     def predict_dataloader(self):
         return None  # what are they on about
