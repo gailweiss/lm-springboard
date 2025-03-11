@@ -79,7 +79,8 @@ def get_train_stats(folder_name, get_lite=True, store_lite=True,
             # no fixes needed to add total_train_samples to lite train_stats -
             # they will all be created from fixed loaded train_stats
         # else:
-        ts = get_train_stats(folder_name, get_lite=False)
+        ts = get_train_stats(folder_name, get_lite=False,
+                             batch_size=batch_size)
         ts = {k: v for k, v in ts.items() if is_lite_key(k)}
         if store_lite:
             with open(lite_file, "w") as f:
@@ -89,10 +90,16 @@ def get_train_stats(folder_name, get_lite=True, store_lite=True,
     with open(path.join(folder_name, "train_stats.json"), "r") as f:
         ts = json.load(f)
         if "total_train_samples" not in ts:
-            if batch_size <= 0:
-                "batch size uknown - total_train_samples inferred incorrectly"
+            correctness_flag = True
+            if (None is batch_size) or (batch_size <= 0):
+                correctness_flag = False
+                batch_size = 0
+                # best i am willing to do for now (could probably infer from
+                # other stats but dont want to)
             ts["total_train_samples"] = \
                 ts.get("n_train_samples", [[0]])[-1][-1] + batch_size
+            ts["total_train_samples_correct"] = correctness_flag
+            print("total_train_samples computed correctly:", correctness_flag)
         # if not got, this is the model at time 0 (no training yet)
         return ts
 
@@ -140,6 +147,7 @@ def get_datamodule(data_params, model_params, verbose=True,
     
     from misc.model_explorer import find_existing_datamodule
     data = find_existing_datamodule(data_params, model_params)
+
     if None is not data:
         return data
 
