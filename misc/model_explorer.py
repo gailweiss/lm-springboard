@@ -11,6 +11,7 @@ import json
 import itertools
 from copy import deepcopy
 from data.dataloader import datamodules_paths, LMDataModule
+import os
 
 
 assert False not in [p.endswith("/saved-models") for p in models_paths]
@@ -127,7 +128,8 @@ def date_in_range(i, min_date, max_date):
     return True
 
 
-def all_identifiers_with_configs(kws, min_date=None, max_date=None, verbose=False):
+def all_identifiers_with_configs(kws, min_date=None, max_date=None,
+        verbose=False, matching_datamodule_id=None):
     # kws: nested dict of configs.
     # level one: data_params, train_params, model_params
     # level two: each config that is being specified in this request,
@@ -167,7 +169,28 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None, verbose=Fals
             res = [i for i in res if
                    get_param(i, paramset_name, param_name) in target_vals]
 
+    if None is not matching_datamodule_id:
+        print(f"got {len(res)} model ids", end=" ")
+        res = [i for i in res if
+               would_load_datamodule(i, matching_datamodule_id)]
+        print(f"of which {len(res)} matched the requested datamodule")
     return res
+
+
+def would_load_datamodule(m_id, d_id):
+    p = get_full_path(m_id)
+    if None is p:
+        return False  # doesnt even exist
+
+    res = load_model_info(p)
+    data_params = res["params"]["data_params"]
+    model_params = res["params"]["model_params"]
+    datamodule_path = find_existing_datamodule_path(
+        data_params, model_params, verbose=False)
+    if not datamodule_path:
+        return False  # found no datamodule
+    identifier = datamodule_path.split("/")[-1]
+    return identifier == d_id
 
 
 def ids_with_missing_paramsets(identifiers, verbose=False):
@@ -266,14 +289,15 @@ def checkpoint_ids(identifier):
         sorted([i for i in chkpts if not isinstance(i, int)])
 
 
-def get_datamodule_by_identifier(identifier):
+def get_datamodule_by_identifier(identifier, skeleton_load=False):
     for p in datamodules_paths:
         paths = glob_nosquares(f"{p}/*/{identifier}")
         if paths:
             assert len(paths) == 1
             path = paths[0]
             print("getting datamodule from:", path)
-            return LMDataModule(None, None, None, None, from_folder=path)
+            return LMDataModule(None, None, None, None, from_folder=path,
+                                skeleton_load=skeleton_load)
 
 
 get_model_cache = {}
@@ -524,8 +548,8 @@ def same_characteristics(identifiers, mp=True, tp=True, dp=True,
     return True
 
 
-def find_existing_datamodule_path(data_params, model_params):
-    def is_match(dpd, mpd):
+def find_existing_datamodule_path(data_params, model_params, verbose=True):
+    def is_match(dpd, mpd, notes):
         # all the attrs that determine the dataset and the tokenizer
         important_model_attrs = ["max_seq_len", "tokenizer_source_name"]
         important_data_attrs = ["dataset_name", "debug_crop",
@@ -535,23 +559,27 @@ def find_existing_datamodule_path(data_params, model_params):
 
         for a in important_data_attrs:
             if not dpd[a] == getattr(data_params, a):
-                print("mismatch on data attr:", a)
+                if verbose:
+                    print("mismatch on data attr:", a)
                 return False
         for a in important_model_attrs:
             if not mpd[a] == getattr(model_params, a):
-                print("mismatch on model attr:", a)
+                if verbose:
+                    print("mismatch on model attr:", a)
                 return False
         if model_params.tokenizer_source_name == "custom":
             if not (mpd["custom_tokenizer_ntokens"] ==
                     model_params.custom_tokenizer_ntokens):
-                print("mismatch on number of tokens")
+                if verbose:
+                    print("mismatch on number of tokens")
                 return False
 
         def same_keys(d,p):
             return sorted(list(d.keys())) == sorted(list(vars(p).keys()))
 
         if not same_keys(dpd, data_params):
-            print("mismatch on data attributes---different branch or commit")
+            if verbose:
+                print("mismatch on data attributes---different branch or commit")
             return False
         # model staying the same not really important so long as the
         # data-relevant attributes (tokenizer, sequence length) are fine
@@ -560,22 +588,29 @@ def find_existing_datamodule_path(data_params, model_params):
         #     return False
         return True
 
-    print("checking for existing datamodule")
+    if verbose:
+        print("checking for existing datamodule")
     for p in datamodules_paths:
-        print("checking inside path:", p)
-        print("path contains:", glob_nosquares(f"{p}/*"))
+        if verbose:
+            print("checking inside path:", p)
+            print("path contains:", glob_nosquares(f"{p}/*"))
         with_identifiers = glob_nosquares(f"{p}/{data_params.dataset_name}/*")
         for path in with_identifiers:
-            print("checking path:", path)
+            if verbose:
+                print("checking path:", path)
             with open(path_join(path, "model_params.json"), "r") as f:
                 mpd = json.load(f)
             with open(path_join(path, "data_params.json"), "r") as f:
                 dpd = json.load(f)
+            with open(path_join(path, f"dataloader_notes.json"), "r") as f:
+                notes = json.load(f)
 
-            if is_match(dpd, mpd):
-                print("matched!")
+            if is_match(dpd, mpd, notes):
+                if verbose:
+                    print("matched!")
                 return path
-    print("no match!")
+    if verbose:
+        print("no match!")
     return None
 
 

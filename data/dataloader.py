@@ -99,8 +99,10 @@ class ForTorchDataSet:
 
 class LMDataModule(pl.LightningDataModule):
     def __init__(self, data, tokenizer, data_params, model_params,
-                 verbose_init=False, from_folder=None):
+                 verbose_init=False, from_folder=None,
+                 skeleton_load=False):
         super().__init__()
+        self.skeleton_load = skeleton_load
         self.from_path = None
         self.verbose_init = verbose_init
         if None is not from_folder:
@@ -117,9 +119,10 @@ class LMDataModule(pl.LightningDataModule):
             else:  # DatasetDict through huggingface
                 self.setup_from_data_dict(data)
             self.prep_for_torch_datasets()
-        self.data_params.total_train_samples = len(self.train_samples)
-        self.data_params.total_samples = \
-            sum([len(ds) for ds in [self.train_samples, self.val_samples,
+        if not self.skeleton_load:
+            self.data_params.total_train_samples = len(self.train_samples)
+            self.data_params.total_samples = \
+                sum([len(ds) for ds in [self.train_samples, self.val_samples,
                                     self.test_samples]])
 
     def set_max_seq_len(self):
@@ -150,6 +153,9 @@ class LMDataModule(pl.LightningDataModule):
         with open(path_join(path, "dataloader_notes.json"), "r") as f:
             base_attrs = json.load(f)
         [setattr(self, an, base_attrs[an]) for an in base_attrs]
+
+        if self.skeleton_load:
+            return
 
         # load train, test, val samples
         for sn in ["train_samples", "test_samples", "val_samples"]:
