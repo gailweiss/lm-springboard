@@ -235,6 +235,13 @@ def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
     if "marker" not in extra_kwargs:
         extra_kwargs["marker"] = "."
     if None is not last_vals:
+        if extra_kwargs["label"] in last_vals:
+            label = extra_kwargs["label"]
+            for i in range(2,30):
+                label2 = f"{label}-{i}"
+                if label2 not in last_vals:
+                    extra_kwargs["label"] = label2
+                    break
         label = extra_kwargs["label"]
         assert label not in last_vals, (label, last_vals)
         last_vals[label] = (x_vals[-1], metric[-1])
