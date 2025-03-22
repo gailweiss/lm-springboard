@@ -440,6 +440,7 @@ def mycollate(b):
     dtype = torch.long
     lengths = [s[0] for s in b]
     seqlen = max(lengths)
+    example_indices = b[0][1]
     device = example_indices.device
     batch_indices = torch.zeros((len(b), seqlen), dtype=dtype, device=device)
     # nasty nasty bug i dont understand makes the assignment into values in a
