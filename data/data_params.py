@@ -6,6 +6,7 @@ from misc.util import apply_dataclass
 @dataclass
 class DataParams:
     dataset_name: str = "ptb"
+    langs: tuple = ("en", "fra_Latn", "heb_Hebr")
     debug_crop: int = None
     breaking_synthetic_samples_ok: bool = False
     val_pct: int = 10
@@ -53,6 +54,9 @@ def set_synthetic_task_flag(data_params):
 #   in a subfolder {folder-name} of your data folder. You can then set
 #   dataset-name={folder-name}, and this code will read it with the function
 #   verysimplesamplesreader defined below.
+# langs:
+#   Which languages to use if loading from a multilingual dataset. Irrelevant
+#   for other datasets.
 # debug_crop:
 #   Number of samples to crop the dataset to, to be used when just doing a
 #   quick run to make sure the code doesn't break. The crop is applied before

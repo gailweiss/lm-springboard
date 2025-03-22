@@ -12,6 +12,7 @@ import numpy as np
 from misc.util import prepare_directory, glob_nosquares
 import json
 from misc.util import printer_print as print
+from tqdm import tqdm
 
 
 try:
@@ -54,6 +55,8 @@ def get_data(data_params):
         samples = ptbloader()
     elif data_params.dataset_name.startswith("c4-"):  # eg c4-en 
         samples = c4loader(data_params)
+    elif data_params.dataset_name == "fineweb-ml":
+        samples = finewebloader(data_params)
     elif data_params.task_type == "synthetic":
         samples = syntheticdatasets.get(data_params.dataset_name)
     elif None is not get_local_datafolder(data_params.dataset_name):
@@ -373,8 +376,8 @@ def c4loader(data_params):
     val_d = iter(d["validation"])  # no test, so will make dummy test from this
     assert None is not data_params.debug_crop
     total_load = int(data_params.debug_crop)
-    val_frac = data_params.val_pct/100
-    test_frac = data_params.test_pct/100
+    val_frac = data_params.val_pct / 100
+    test_frac = data_params.test_pct / 100
     train_frac = 1 - (val_frac + test_frac)
     n_train_fullsamples = int(total_load * train_frac)
     n_val_fullsamples = int(total_load * val_frac)
@@ -465,3 +468,68 @@ def mycollate(b):
     if None is not mask:
         mask = mask.to(device=device)
     return {"x_indices": batch_indices.to(device=device), "mask": mask}
+
+
+class MultiFineWeb:
+    def __init__(self, langs):
+        self.datasets = {}
+        self.langs = langs
+        for lang in self.langs:
+            if not lang == "en":
+                self.datasets[lang] = datasets.load_dataset(
+                    "HuggingFaceFW/fineweb-2", name=lang, streaming=True)
+            else:
+                self.datasets[lang] = datasets.load_dataset(
+                    "HuggingFaceFW/fineweb", name="CC-MAIN-2024-18", streaming=True)
+        self.iterators = {lang:{"train": iter(self.datasets[lang]["train"])}
+                          for lang in self.datasets}
+        for lang in self.langs:
+            if "test" in self.datasets[lang]:
+                self.iterators[lang]["test"] = \
+                    iter(self.datasets[lang]["test"])
+        self.c = 0
+        self.nl = len(self.langs)
+
+    def get_next_sample_full(self, split):
+        # can consider implementing different proportions for data later,
+        # if see dont have enough
+        lang = self.langs[self.c % self.nl]
+        self.c += 1
+        it_d = self.iterators[lang]
+        it = it_d.get(split, it_d["train"])  # if no test available, continue
+        # iterator from train, getting samples that havent been put in own train yet
+        return next(it)
+
+    def get_next_sample_small(self, split):
+        s = self.get_next_sample_full(split)
+        return (s["text"], s["language"]) 
+        # "en" samples can also give s["token_count"], the number of tokens
+        # they would use in gpt2. but this is not present in the fineweb2
+        # samples, so avoiding here
+    
+
+def finewebloader(data_params):
+    # interesting note: fineweb samples also have the token count for how many
+    # tokens they would use in the gpt2 tokenizer. could be useful if trying to
+    # really balance data down the line, for now am ignoring
+    langs = tuple(sorted(list(data_params.langs)))
+    print("getting fineweb langs:", langs)
+    d = MultiFineWeb(langs)
+    assert None is not data_params.debug_crop
+    total_load = int(data_params.debug_crop)
+    val_frac = data_params.val_pct / 100
+    test_frac = data_params.test_pct / 100
+    train_frac = 1 - (val_frac + test_frac)
+    n_train_fullsamples = int(total_load * train_frac)
+    n_val_fullsamples = int(total_load * val_frac)
+    n_test_fullsamples = int(total_load * test_frac)
+    res = {}
+    res["train"] = [d.get_next_sample_small("train")[0] for _ in
+                    tqdm(range(n_train_fullsamples))]
+    # no val sets in fineweb, and val effectively used for training, so get
+    # data from there
+    res["validation"] = [d.get_next_sample_small("train")[0] for _ in
+                         tqdm(range(n_val_fullsamples))]
+    res["test"] = [d.get_next_sample_small("test")[0] for _ in
+                   tqdm(range(n_test_fullsamples))]
+    return res
