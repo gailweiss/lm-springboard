@@ -26,6 +26,9 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
         d["task_type"] = "synthetic" if d[synth_task_note] else "natural"
         del d[synth_task_note]
 
+    if "debug_crop" in d:
+        d["debug_crop"] = int(d["debug_crop"])
+
     res = apply_dataclass(DataParams, d, forgiving=forgiving,
                           convert_lists_to_tuples=convert_lists_to_tuples,
                           verbose=verbose, takes_extras=takes_extras)
