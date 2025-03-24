@@ -30,6 +30,14 @@ class LM(nn.Module):
         self.ordered_tokens = \
             list(self.tokenizer.convert_ids_to_nice_string([i]) for i in
                  range(self.tokenizer.vocab_size()))
+        if self.model_params.tie_embed_deembed:
+            assert self.embed is not None and self.de_embedder is not None, \
+                "Embedding layers must exist to tie weights"
+            if self.embed.word.weight.shape != self.de_embedder.weight.shape:
+                raise ValueError("Embedding and de-embedding dimensions don't match "
+                            f"for tying: {self.embed.word.weight.shape} vs "
+                            f"{self.de_embedder.weight.shape}")
+            self.de_embedder.weight = self.embed.word.weight  
 
     def in_main_part(self, param_name):
         return "decoder." in param_name
