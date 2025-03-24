@@ -110,8 +110,9 @@ class LMDataModule(pl.LightningDataModule):
         self.skeleton_load = skeleton_load
         self.from_path = None
         self.verbose_init = verbose_init
-        self.lang_counters = lang_counters  # doesnt tell you which sample
-        # is which lang, but at least tells you how many there are
+        self.lang_fullsample_counts = lang_counters  # doesnt tell you which
+        # sample is which lang, but at least tells you how many there are.
+        # note: counts *full* samples - ie before chunking for the max seq len
         if None is not from_folder:
             self.setup_from_folder(from_folder)
         else:
@@ -198,7 +199,8 @@ class LMDataModule(pl.LightningDataModule):
         # save tokenizer, save self
         self.from_path = path
         self.tokenizer.save(path)
-        base_attr_names = ["train_n", "test_n", "val_n", "lang_counters"]
+        base_attr_names = ["train_n", "test_n", "val_n",
+                           "lang_fullsample_counts"]
         notes = {n: getattr(self, n) for n in base_attr_names}
         with open(path_join(path, f"dataloader_notes.json"), "w") as f:
             json.dump(notes, f)
