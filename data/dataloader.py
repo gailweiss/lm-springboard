@@ -13,6 +13,7 @@ from misc.util import prepare_directory, glob_nosquares
 import json
 from misc.util import printer_print as print
 from tqdm import tqdm
+from collections import Counter
 
 
 try:
@@ -47,6 +48,7 @@ def get_local_datafolder(n):
 
 
 def get_data(data_params):
+    lang_counters = None
     if data_params.dataset_name == "dummy":
         samples = verysimplesamplesreader(".", data_params)
     elif data_params.dataset_name == "wikitext":
@@ -56,7 +58,7 @@ def get_data(data_params):
     elif data_params.dataset_name.startswith("c4-"):  # eg c4-en 
         samples = c4loader(data_params)
     elif data_params.dataset_name == "fineweb-ml":
-        samples = finewebloader(data_params)
+        samples, lang_counters = finewebloader(data_params)
     elif data_params.task_type == "synthetic":
         samples = syntheticdatasets.get(data_params.dataset_name)
     elif None is not get_local_datafolder(data_params.dataset_name):
@@ -79,7 +81,7 @@ def get_data(data_params):
             samples = apply_crop(samples)
         else:
             samples = {n: apply_crop(samples[n]) for n in samples}
-    return samples
+    return samples, lang_counters
 
 
 class ForTorchDataSet:
@@ -102,12 +104,14 @@ class ForTorchDataSet:
 
 class LMDataModule(pl.LightningDataModule):
     def __init__(self, data, tokenizer, data_params, model_params,
-                 verbose_init=False, from_folder=None,
-                 skeleton_load=False):
+                 verbose_init=False, from_folder=None, skeleton_load=False,
+                 lang_counters=None):
         super().__init__()
         self.skeleton_load = skeleton_load
         self.from_path = None
         self.verbose_init = verbose_init
+        self.lang_counters = lang_counters  # doesnt tell you which sample
+        # is which lang, but at least tells you how many there are
         if None is not from_folder:
             self.setup_from_folder(from_folder)
         else:
@@ -126,7 +130,7 @@ class LMDataModule(pl.LightningDataModule):
             self.data_params.total_train_samples = len(self.train_samples)
             self.data_params.total_samples = \
                 sum([len(ds) for ds in [self.train_samples, self.val_samples,
-                                    self.test_samples]])
+                                        self.test_samples]])
 
     def set_max_seq_len(self):
         self.max_seq_len = self.model_params.max_seq_len
@@ -194,7 +198,7 @@ class LMDataModule(pl.LightningDataModule):
         # save tokenizer, save self
         self.from_path = path
         self.tokenizer.save(path)
-        base_attr_names = ["train_n", "test_n", "val_n"]
+        base_attr_names = ["train_n", "test_n", "val_n", "lang_counters"]
         notes = {n: getattr(self, n) for n in base_attr_names}
         with open(path_join(path, f"dataloader_notes.json"), "w") as f:
             json.dump(notes, f)
@@ -442,6 +446,7 @@ def mycollate(b):
     seqlen = max(lengths)
     example_indices = b[0][1]
     device = example_indices.device
+
     batch_indices = torch.zeros((len(b), seqlen), dtype=dtype, device=device)
     # nasty nasty bug i dont understand makes the assignment into values in a
     # special branch go very wrong (massive (overflow?) values in row 1, and
@@ -490,16 +495,28 @@ class MultiFineWeb:
                     iter(self.datasets[lang]["test"])
         self.c = 0
         self.nl = len(self.langs)
+        self.ran_out = set()
 
-    def get_next_sample_full(self, split):
+    def get_next_sample_full(self, split, attempt=0):
         # can consider implementing different proportions for data later,
         # if see dont have enough
+        if attempt > self.nl:
+            print("all datasets exhausted, cannot continue")
+            raise NotImplementedError
         lang = self.langs[self.c % self.nl]
         self.c += 1
         it_d = self.iterators[lang]
         it = it_d.get(split, it_d["train"])  # if no test available, continue
-        # iterator from train, getting samples that havent been put in own train yet
-        return next(it)
+        # iterator from train, getting samples that havent been put in own
+        # train yet
+        try:
+            return next(it)
+        except StopIteration as e:
+            if (lang, split) not in self.ran_out:
+                self.ran_out.update([(lang, split)])
+                print("ran out of samples for language", lang,
+                      "in split", split)
+            return self.get_next_sample_full(split, attempt=attempt + 1)
 
     def get_next_sample_small(self, split):
         s = self.get_next_sample_full(split)
@@ -513,8 +530,8 @@ def finewebloader(data_params):
     # interesting note: fineweb samples also have the token count for how many
     # tokens they would use in the gpt2 tokenizer. could be useful if trying to
     # really balance data down the line, for now am ignoring
-    langs = tuple(sorted(list(data_params.langs)))
-    print("getting fineweb langs:", langs)
+    langs = data_params.langs
+    print("\n\ngetting fineweb langs:", langs)
     d = MultiFineWeb(langs)
     assert None is not data_params.debug_crop
     total_load = int(data_params.debug_crop)
@@ -524,13 +541,97 @@ def finewebloader(data_params):
     n_train_fullsamples = int(total_load * train_frac)
     n_val_fullsamples = int(total_load * val_frac)
     n_test_fullsamples = int(total_load * test_frac)
+    fullnumbers = [n_train_fullsamples, n_val_fullsamples, n_test_fullsamples]
+    print("working with data_params:", data_params)
+    print("so want to get train/val/test amounts:", fullnumbers)
     res = {}
-    res["train"] = [d.get_next_sample_small("train")[0] for _ in
+    print("loading fineweb samples - train, val, test")
+    res["train"] = [d.get_next_sample_small("train") for _ in
                     tqdm(range(n_train_fullsamples))]
     # no val sets in fineweb, and val effectively used for training, so get
     # data from there
-    res["validation"] = [d.get_next_sample_small("train")[0] for _ in
+    res["validation"] = [d.get_next_sample_small("train") for _ in
                          tqdm(range(n_val_fullsamples))]
-    res["test"] = [d.get_next_sample_small("test")[0] for _ in
+    res["test"] = [d.get_next_sample_small("test") for _ in
                    tqdm(range(n_test_fullsamples))]
-    return res
+
+    def print_sample_counts(relation):
+        actual_nums = {n: len(res[n]) for n in res}
+        actual_nums["total"] = sum(list(actual_nums.values()))
+        print(f"\n\n{relation} balancing, got # samples: {actual_nums}")
+        print(f"{relation} balancing, val pct is:",
+              actual_nums["validation"] / actual_nums["total"])
+        print(f"{relation} balancing, test pct is:",
+              actual_nums["test"] / actual_nums["total"])
+
+    print_sample_counts("before")
+    print("\n\nnow balancing")
+    final_lang_counters = assure_validation(data_params, res)
+    print_sample_counts("after")
+
+    for dataset_name in res:
+        res[dataset_name] = [s[0] for s in res[dataset_name]]
+        # remove language notes
+    return res, final_lang_counters
+
+
+def assure_validation(data_params, multilingual_samples):
+    def count_languages():
+        counters = {}
+        for dataset_name, samples in multilingual_samples.items():
+            # train, test, validation
+            counters[dataset_name] = Counter()
+            for seq, lang in samples:
+                counters[dataset_name][lang] += 1
+        return counters
+
+    def lacking_validation(lang, verbose=True):
+        n_train = counters["train"][lang]
+        n_val = counters["validation"][lang]
+        n_test = counters["test"][lang]
+        if n_val <= 0:
+            if verbose:
+                print("\nno val data for lang:", lang)
+            return True
+        if n_test <= 0:
+            if verbose:
+                print("\nnote! no test data for lang:", lang)
+        if ((n_train * goal_val_v_train) - n_val) > 2:
+            if verbose:
+                print(lang, "val pct low:", 
+                      (n_train, n_val, n_test),
+                      n_val / n_train, goal_val_v_train, data_params)
+            return True
+        if abs((n_train * goal_test_v_train) - n_test) > 2:
+            if verbose:
+                print("\nnote! test pct off for lang:", lang,
+                      "(", (n_train, n_val, n_test),
+                      n_test / n_train, goal_test_v_train, data_params, ")")
+        return False
+
+    def force_validation(lang):
+        train_samples = multilingual_samples["train"]
+        val_samples = multilingual_samples["validation"]
+        ts_not_lang = [(s, ls) for (s, ls) in train_samples if ls != lang]
+        ts_lang = [(s, ls) for (s, ls) in train_samples if ls == lang]
+        n_val_missing = int((goal_val_v_train * counters["train"][lang]) -
+                            counters["validation"][lang])
+        print(f"forcing validation samples in {lang}, taking {n_val_missing}",
+              "samples from train to val")
+        val_samples += ts_lang[-n_val_missing:]
+        multilingual_samples["train"] = ts_not_lang + ts_lang[:-n_val_missing]
+
+    train_pct = 100 - data_params.val_pct - data_params.test_pct
+    goal_val_v_train = data_params.val_pct / train_pct
+    goal_test_v_train = data_params.test_pct / train_pct
+    counters = count_languages()
+    print("initial language counters of dataset are:", counters)
+    for lang in counters["train"]:
+        if lacking_validation(lang):
+            force_validation(lang)
+            counters = count_languages()
+            print("\nnew counters of dataset are:", counters)
+            assert not lacking_validation(lang), counters
+    counters = count_languages()
+    print("\nfinally, language counters are:", counters)
+    return counters
