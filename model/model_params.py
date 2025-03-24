@@ -16,6 +16,7 @@ class ModelParams:
     from_saved: str = ""
     individual_head_params: bool = False
     pos_encoding: str = "learned"
+    tie_embed_deembed: bool = False
 
 
 def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
@@ -118,3 +119,5 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #           As with "learned", but here the embedding is predetermined.
 #           Specifically, it is set to the sinusoidal positional encoding used
 #           in the original transformer paper, "Attention is all you need".
+# tie_embed_deembed:
+#   Whether to tie the weights of the embedding and deembedding layers.
