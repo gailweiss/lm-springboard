@@ -557,6 +557,9 @@ def find_existing_datamodule_path(data_params, model_params, verbose=True):
                                 "val_pct", "test_pct", "lines_per_sample",
                                 "max_seq_len"]
 
+        if "fineweb" in dpd["dataset_name"]:
+            important_data_attrs.append("langs")
+
         for a in important_data_attrs:
             if not dpd[a] == getattr(data_params, a):
                 if verbose:
