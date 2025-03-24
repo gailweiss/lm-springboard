@@ -522,11 +522,11 @@ class MultiFineWeb:
 
     def get_next_sample_small(self, split):
         s = self.get_next_sample_full(split)
-        return (s["text"], s["language"]) 
+        return (s["text"], f"Lang[{s['language']}]")
         # "en" samples can also give s["token_count"], the number of tokens
         # they would use in gpt2. but this is not present in the fineweb2
         # samples, so avoiding here
-    
+
 
 def finewebloader(data_params):
     # interesting note: fineweb samples also have the token count for how many
