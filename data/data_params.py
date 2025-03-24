@@ -26,7 +26,7 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
         d["task_type"] = "synthetic" if d[synth_task_note] else "?"
         del d[synth_task_note]
 
-    if "debug_crop" in d:
+    if None is not d.get("debug_crop", None):
         d["debug_crop"] = int(d["debug_crop"])
 
     if "langs" in d:
