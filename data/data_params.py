@@ -6,7 +6,7 @@ from misc.util import apply_dataclass
 @dataclass
 class DataParams:
     dataset_name: str = "ptb"
-    langs: tuple = ("en", "fra_Latn", "roh_Latn", "deu_Latn")
+    langs: tuple = ("en", "fra_Latn", "roh_Latn", "deu_Latn", "ita_Latn")
     debug_crop: int = None
     breaking_synthetic_samples_ok: bool = False
     val_pct: int = 10
