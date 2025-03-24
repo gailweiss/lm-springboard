@@ -23,7 +23,7 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
     # correct old data_params to new attr:
     synth_task_note = "is_synthetic_task"
     if synth_task_note in d:
-        d["task_type"] = "synthetic" if d[synth_task_note] else "natural"
+        d["task_type"] = "synthetic" if d[synth_task_note] else "?"
         del d[synth_task_note]
 
     if "debug_crop" in d:
@@ -40,8 +40,11 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
 
 
 def set_synthetic_task_flag(data_params):
-    data_params.task_type = "synthetic" if \
-        syntheticdatasets.has_dataset(data_params.dataset_name) else "natural"
+    if syntheticdatasets.has_dataset(data_params.dataset_name):
+        return "synthetic"
+    if "fineweb" in data_params.dataset_name and len(data_params.langs) > 1:
+        return "multilingual natural"
+    return "plain natural"
 
 
 # dataset_name:
