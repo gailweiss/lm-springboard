@@ -29,6 +29,10 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
     if "debug_crop" in d:
         d["debug_crop"] = int(d["debug_crop"])
 
+    if "langs" in d:
+        d["langs"] = tuple(sorted(list(d["langs"])))
+        # canonise for consistent lookup of language combinations
+
     res = apply_dataclass(DataParams, d, forgiving=forgiving,
                           convert_lists_to_tuples=convert_lists_to_tuples,
                           verbose=verbose, takes_extras=takes_extras)
