@@ -6,7 +6,7 @@ from misc.util import apply_dataclass
 @dataclass
 class DataParams:
     dataset_name: str = "ptb"
-    langs: tuple = ("en", "fra_Latn", "heb_Hebr")
+    langs: tuple = ("en", "fra_Latn", "roh_Latn", "deu_Latn")
     debug_crop: int = None
     breaking_synthetic_samples_ok: bool = False
     val_pct: int = 10
@@ -38,12 +38,12 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
                           verbose=verbose, takes_extras=takes_extras)
 
     if redo_synth_eval or d.get("task_type", "?") == "?":
-        set_synthetic_task_flag(res)
+        res.task_type = synthetic_task_flag(res)
     return res
     # ready for fixes over time
 
 
-def set_synthetic_task_flag(data_params):
+def synthetic_task_flag(data_params):
     if syntheticdatasets.has_dataset(data_params.dataset_name):
         return "synthetic"
     if "fineweb" in data_params.dataset_name and len(data_params.langs) > 1:
