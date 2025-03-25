@@ -603,8 +603,12 @@ def find_existing_datamodule_path(data_params, model_params, verbose=True):
                 print("checking path:", path)
             with open(path_join(path, "model_params.json"), "r") as f:
                 mpd = json.load(f)
+                mpd = {k: tuple(v) if isinstance(v, list) else v for
+                       k, v in mpd.items()}
             with open(path_join(path, "data_params.json"), "r") as f:
                 dpd = json.load(f)
+                dpd = {k: tuple(v) if isinstance(v, list) else v for
+                       k, v in dpd.items()}
             with open(path_join(path, f"dataloader_notes.json"), "r") as f:
                 notes = json.load(f)
 
