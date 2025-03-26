@@ -315,3 +315,11 @@ def convert_all_nested_lists_to_tuples(iterable):
         return {k: convert_all_nested_lists_to_tuples(v) for k, v in
                 iterable.items()}
     return iterable
+
+
+def constrained_input(msg, constraints):
+    assert constraints
+    res = input(msg)
+    while res not in constraints:
+        res = input(msg)
+    return res

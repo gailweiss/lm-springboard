@@ -3,7 +3,8 @@ from misc.save_load import load_model, load_model_info, final_chkpt, \
 import lightning as pl
 from train.trainer import Trainer
 import torch
-from misc.util import glob_nosquares, pad, same_dict_structure
+from misc.util import glob_nosquares, pad, same_dict_structure, \
+                      constrained_input
 import sys
 from os.path import join as path_join
 from misc.util import printer_print as print
@@ -126,6 +127,47 @@ def date_in_range(i, min_date, max_date):
         if ts < min_date:
             return False
     return True
+
+
+def refine_model_ids_choice(all_ids, subfolder_substr=None,
+                            allowed_differences=None):
+    if None is not subfolder_substr:
+        all_ids = [i for i in all_ids if subfolder_substr in
+                   get_full_path(i)]
+    allowed_differences = ["random_seed"] if None is allowed_differences \
+                          else allowed_differences
+    all_vals = get_configs_values(all_ids)
+    meaningful_diffs = {}
+    diff_vals = {}
+    mdc = 0
+    for pn, p in all_vals.items():
+        for attr, vals in p.items():
+            if attr in allowed_differences:
+                continue
+            if len(vals) > 1:
+                print(pn, attr, vals)
+                meaningful_diffs[mdc] = (pn, attr)
+                diff_vals[mdc] = {i: v for i, v in enumerate(vals)}
+                mdc += 1
+    if meaningful_diffs:
+        print("found training logs had differences on keys:")
+        print(meaningful_diffs)
+        refine = constrained_input("refine? y/n: ", "yn") == "y"
+        if refine:
+            k = int(constrained_input("which key? (enter number): ",
+                                      list(map(str, meaningful_diffs.keys()))))
+            p, attr = meaningful_diffs[k]
+            print("selected:", p, attr)
+            print("vals are:", diff_vals[k])
+            i = int(constrained_input(
+                "restrict to which val? (enter number): ",
+                list(map(str, diff_vals[k].keys()))))
+            v = diff_vals[k][i]
+            all_ids = [mid for mid in all_ids if
+                       getattr(get_info(mid)["params"][p], attr) == v]
+            return refine_model_ids_choice(
+                all_ids, allowed_differences=allowed_differences)
+    return all_ids
 
 
 def all_identifiers_with_configs(kws, min_date=None, max_date=None,
