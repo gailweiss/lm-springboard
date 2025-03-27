@@ -60,7 +60,7 @@ def get_line_labeler(identifiers, all_metric_names, shared_ylabel):
 
 def _plot(ax, x, y, s=0.5, plot_type="scatter",
           max_x=None, min_x=None, max_y=None, min_y=None,
-          extra_kwargs=None, max_points_per_line=None):
+          extra_kwargs=None, max_points_per_line=None, failure_note=None):
     
     def keep(vx, vy):
         return (vx < max_x) and (vx > min_x) and (vy < max_y) and (vy > min_y)
@@ -69,7 +69,17 @@ def _plot(ax, x, y, s=0.5, plot_type="scatter",
     min_x = min_x if None is not min_x else -torch.inf
     max_y = max_y if None is not max_y else torch.inf
     min_y = min_y if None is not min_y else -torch.inf
-    x, y = list(zip(*[(vx, vy) for vx, vy in zip(x, y) if keep(vx, vy)]))
+
+    keep_pairs = [(vx, vy) for vx, vy in zip(x, y) if keep(vx, vy)]
+    if not keep_pairs:
+        if None is not failure_note:
+            print("\n\n_plot found no pairs in range for", failure_note)
+            print(f"got x, y:\n\n{x}\n\n{y}")
+            print(f"\nlimits are: x: [{min_x}, {max_x}],",
+                  f"y: [{min_y}, {max_y}]")
+        return None
+
+    x, y = list(zip(*keep_pairs))
 
     if None is not max_points_per_line:
         if len(x) > max_points_per_line:
@@ -248,6 +258,7 @@ def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
     return _plot(ax, x_vals, metric, plot_type=plot_type, max_x=max_x,
                  min_x=min_x, max_y=max_y, min_y=min_y,
                  extra_kwargs=extra_kwargs,
+                 failure_note=f"metric: {metric_name}, id: {identifier}",
                  max_points_per_line=max_points_per_line)
 
 
@@ -314,15 +325,19 @@ def plot_metrics(identifiers, metric_names_ax1, metric_names_ax2=None,
             continue
         for i in identifiers:
             for m in metric_names:
-                plot["artists"].append(_get_and_plot(
+                new_plot = _get_and_plot(
                     ax, i, m, metric_names, x_axis, stylist, line_labeler,
                     dropped_syncs, verbose=verbose, plot_type=plot_type,
                     max_x=max_x, min_x=min_x, max_y=max_y, min_y=min_y,
                     max_points_per_line=max_points_per_line,
                     no_caching=no_caching, last_vals=plot["last_val"],
-                    preloaded_metrics=preloaded_metrics))
+                    preloaded_metrics=preloaded_metrics)
+                if None is not new_plot:
+                    # could be None if no values in requested range
+                    plot["artists"].append(new_plot)
 
-    plot["fig"] = complete_plot(plot["ax1"], plot["artists"], legend_outside, legend_markerscale)
+    plot["fig"] = complete_plot(plot["ax1"], plot["artists"], legend_outside,
+                                legend_markerscale)
     show_and_save_plot(plot["fig"], identifiers, all_metric_names, dropped_syncs,
                        skip_show, filename, add_to_pdf, close_at_end)
 
