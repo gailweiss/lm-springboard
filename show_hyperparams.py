@@ -82,10 +82,12 @@ def all_stats_with(m_id, must_contain):
     return [s for s in stats if False not in [n in s for n in must_contain]]
 
 
-def draw_all(args, all_ids, pdfname):
-    with PdfPages(pdfname) as pdf:
+def draw_all(args, all_ids, folder):
+    util.prepare_directory(folder)
+    for eval_name in get_ranges(args):  # train_batch, val
         for stat in ["loss", "acc"]:
-            for eval_name in get_ranges(args):  # train_batch, val
+            pdfname = os.path.join(folder, f"{eval_name}-{stat}.pdf")
+            with PdfPages(pdfname) as pdf:
                 extras = make_extra_plot_kwargs(args, eval_name)
                 for fullstat in all_stats_with(all_ids[0], [eval_name, stat]):
                     shortstat = nice_stat_name(fullstat)
@@ -105,14 +107,12 @@ def draw_param_grouped_lines(args, all_ids, folder):
                 changing_params.append(((p, a), sorted(list(d[p][a]))))
     for (p, a), vals in changing_params:
         stylist.set_by_param(p, a, vals)
-        pdfname = os.path.join(folder, f"by-{a}.pdf")
-        draw_all(args, all_ids, pdfname)
+        draw_all(args, all_ids, os.path.join(folder, f"by-{a}"))
 
 
 def draw_ungrouped_lines(args, all_ids, folder):
     stylist.prepare(args, all_ids)
-    pdfname = os.path.join(folder, "by-models.pdf")
-    draw_all(args, all_ids, pdfname)
+    draw_all(args, all_ids, os.path.join(folder, "by-models"))
 
 
 def run_main():
