@@ -306,8 +306,13 @@ class MyTokenizer:
 
     def eos(self):
         ids = self("")
-        assert len(self("")) == 2  # bos, eos
-        return self("")[-1]
+        assert len(ids) == 2  # bos, eos
+        return ids[-1]
+
+    def bos(self):
+        ids = self("")
+        assert len(ids) == 2  # bos, eos
+        return ids[0]
 
     def tokenize_without_stop(self, s):
         tokens = self(s)
