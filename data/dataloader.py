@@ -328,19 +328,24 @@ class LMDataModule(pl.LightningDataModule):
         # when running on my mac for too many epochs (batches dont bother it
         # - epochs do). i dont need this
 
-    def get_sample(self, i):
+    def get_sample(self, i, from_ds="all"):
         orig_i = i
-        datasets = [self.train_samples, self.val_samples, self.test_samples]
+        if from_ds == "all":
+            datasets = [self.train_samples, self.val_samples,
+                        self.test_samples]
+        else:
+            datasets = [getattr(self, f"{from_ds}_samples")]
         for ds in datasets:
             if i < len(ds):
                 n, indices = ds[i]  # length, indices
                 return n, indices[:n]
             i -= len(ds)
         n = sum([len(ds) for ds in datasets])
-        raise Exception(f"no sample at index {orig_i}, only have {n} samples")
+        raise Exception(f"no sample at index {orig_i}, only have {n}" +\
+                        f"samples in dataset {from_ds}")
 
-    def get_sample_str(self, i=0):
-        n, indices = self.get_sample(i)
+    def get_sample_str(self, i=0, from_ds="all"):
+        n, indices = self.get_sample(i, from_ds=from_ds)
         return self.tokenizer.convert_ids_to_nice_string(indices)
 
     def show_sample(self, i=0):
