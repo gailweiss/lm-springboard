@@ -341,7 +341,7 @@ class LMDataModule(pl.LightningDataModule):
                 return n, indices[:n]
             i -= len(ds)
         n = sum([len(ds) for ds in datasets])
-        raise Exception(f"no sample at index {orig_i}, only have {n}" +\
+        raise Exception(f"no sample at index {orig_i}, only have {n} " +\
                         f"samples in dataset {from_ds}")
 
     def get_sample_str(self, i=0, from_ds="all"):
