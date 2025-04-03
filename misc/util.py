@@ -323,3 +323,12 @@ def constrained_input(msg, constraints):
     while res not in constraints:
         res = input(msg)
     return res
+
+
+def lighten_rgb(tup, factor=0.8, light_cap=255):
+    diffs = [255 - v for v in tup]
+    diffs = [int(d * factor) for d in diffs]
+    vals = [255 - d for d in diffs]
+    if True not in [v < light_cap for v in vals]:
+        vals = [light_cap] * 3
+    return tuple(vals)
