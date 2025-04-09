@@ -414,7 +414,9 @@ def get_all_checkpoints_by_identifier(identifier, verbose=True, with_data=True,
         desc = final_chkpt if desc == final_chkpt else int(desc)
         res = load_model(p, full=True, verbose=verbose,
                          with_data=with_data)
-        results["models"][desc] = {a: res[a] for a in ["lm", "train_stats"]}
+        results["models"][desc] = {"lm": res["lm"]}
+        if "train_stats" in res:
+            results["models"][desc]["train_stats"] = res["train_stats"]
 
         if "params" not in results:
             if with_data:
