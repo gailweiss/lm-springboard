@@ -1,0 +1,5 @@
+to run a script from a nested directory (as in here) and not break the imports, use the -m ("run as module") option in python:
+
+instead of 'python3 scripts/myscript.py --arg1=a', use:
+
+'python3 -m scripts.myscript --arg1=a'

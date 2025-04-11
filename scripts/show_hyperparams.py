@@ -10,7 +10,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 from copy import copy
 import itertools
-from misc.plot_scripts_util import plot_tracker, get_ranges, \
+from scripts.plot_scripts_util import plot_tracker, get_ranges, \
     make_extra_plot_kwargs, print_plot_models_and_notes, setup
 from tqdm import tqdm
 from dataclasses import asdict
