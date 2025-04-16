@@ -23,6 +23,8 @@ def note_args_and_models(notes_folder, args, all_ids, min_date, max_date):
         print("called plot scripts with args:\n\n", file=f)
         util.print_nicely_nested(vars(args), file=f)
     with open(os.path.join(notes_folder, "main-notes.txt"), "w") as f:
+        print("called plot scripts with args:\n\n", file=f)
+        util.print_nicely_nested(vars(args), file=f)
         print("\n\ngot trained models with dates ranging from",
               min_date, "to", max_date, "\n\n", file=f)
         for i in sorted(all_ids):
