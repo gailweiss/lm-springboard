@@ -608,11 +608,13 @@ def find_existing_datamodule_path(data_params, model_params, verbose=True):
             if not dpd[a] == getattr(data_params, a):
                 if verbose:
                     print("mismatch on data attr:", a)
+                    print(f"wanted: {getattr(data_params, a)}, got: {dpd[a]}")
                 return False
         for a in important_model_attrs:
             if not mpd[a] == getattr(model_params, a):
                 if verbose:
                     print("mismatch on model attr:", a)
+                    print(f"wanted: {getattr(model_params, a)}, got: {mpd[a]}")
                 return False
         if model_params.tokenizer_source_name == "custom":
             if not (mpd["custom_tokenizer_ntokens"] ==
@@ -665,10 +667,11 @@ def find_existing_datamodule_path(data_params, model_params, verbose=True):
     return None
 
 
-def find_existing_datamodule(data_params, model_params):
+def find_existing_datamodule(data_params, model_params, skeleton_load=False):
     path = find_existing_datamodule_path(data_params, model_params)
     if None is not path:
-        return LMDataModule(None, None, None, None, from_folder=path)
+        return LMDataModule(None, None, None, None, from_folder=path,
+                            skeleton_load=skeleton_load)
     else:
         print("no path for these params")
         return None
