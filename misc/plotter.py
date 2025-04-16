@@ -219,8 +219,14 @@ def get_metrics(identifier, metrics, preloaded_metrics, no_caching):
         print(f"loading train stats to get {metrics} for {identifier}")
         print(f"identifier was present:",identifier in preloaded_metrics)
         if identifier in preloaded_metrics:
-            print(f"only had metrics:",
-                  list(preloaded_metrics[identifier].keys()))
+            # print(f"only had metrics:",
+            #       list(preloaded_metrics[identifier].keys()))
+            print("missing metrics were:",
+                  [m for m in metrics if
+                   m not in preloaded_metrics[identifier]])
+            print("available metrics were:",
+                  preloaded_metrics[identifier].keys())
+
     i = get_info(identifier, with_train_stats=True, dont_cache=no_caching)
     return i["train_stats"]
 
@@ -229,8 +235,8 @@ def _get_and_plot(ax, identifier, metric_name, metric_names, x_axis, stylist,
                   plot_type="scatter", max_x=None, min_x=None, max_y=None,
                   min_y=None, max_points_per_line=None, no_caching=False,
                   preloaded_metrics=None, last_vals=None):
-    train_stats = get_metrics(identifier, [metric_name, x_axis], preloaded_metrics,
-                         no_caching)
+    train_stats = get_metrics(identifier, [metric_name, x_axis],
+        preloaded_metrics, no_caching)
     if metric_name not in train_stats:
         return
     aligned_vals, ds = get_aligned_vals(
