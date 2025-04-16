@@ -86,7 +86,8 @@ class CharTokenizer:
 
     def __call__(self, samples):
         def single(s):
-            return [self.bos_token_id] + [self.tok2id[t] for t in s] +\
+            return [self.bos_token_id] +\
+                   [self.tok2id.get(t, self._pad_token_type_id) for t in s] +\
                    [self.eos_token_id]
         res = single(samples) if isinstance(samples, str) else \
             [single(s) for s in samples]
