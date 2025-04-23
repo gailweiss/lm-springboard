@@ -35,6 +35,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str, default="debug")
 parser.add_argument('--task', type=str, default=None)  # e.g. copy, wikitext
 parser.add_argument('--wandb-proj-name', type=str, default=None)
+parser.add_argument('--wandb-run-note', type=str, default='')
 parser.add_argument('--save', action='store_true')  # save all including model
 parser.add_argument('--save-stats', action='store_true')  # save all but model
 # no ablations exist in the base code, but this arg is ready for adding them:
@@ -78,7 +79,11 @@ class Namer:
     def run_name(self):
         model_str = f"L:[{self.mp.n_layers}]-D:[{self.mp.dim}]" +\
                     f"-H:[{self.mp.n_heads}]"
-        return None  # until want to overwrite it
+        note = self.args.wandb_run_note
+        if note:
+            return f"{note}--{model_str}"
+        else:
+            return None  # until want to overwrite it
 
     def save_folder_name(self, given_run_name):
         # given run name might have come from wandb so need to receive it
