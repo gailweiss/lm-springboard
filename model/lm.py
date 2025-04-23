@@ -275,8 +275,11 @@ class LM(nn.Module):
         embeddings = torch.stack(embeddings_list).transpose(0, 1) if\
             get_embeddings else None
         # embeddings shape:
-        # batch size X n layers + 1 X seq len X embedding dim
-        # (n layers + 1 because input embeddings)
+        # batch size X n layers + 1 (if transformer) or just 1 (if RNN) X
+        # seq len X embedding dim
+        # (transformers: n layers + 1 because input embeddings.
+        #  rnns:         getting all of these is slow in pytorch, so only
+        #                giving easily available top layer).
         # logits shape:
         # batch size X seq len X vocab size
         # attns shape:

@@ -36,6 +36,12 @@ class RNN(nn.Module):
         return False   # no RNN components are layernorms
 
     def store_cache(self, x, state):
+        # TODO: cache should actually also store the out,
+        # and prepend it to the new out in order to give
+        # actual output as expected. but because never train
+        # with batch size 1 and even if doing so unlikely to
+        # be training with extension of previous batch (ie no prefix match),
+        # never really hit this issue        
         assert len(x.shape) == 3
         if x.shape[0] == 1:  # batch size 1
             self.cache_x = x
@@ -65,15 +71,20 @@ class RNN(nn.Module):
 
     def forward(self, x, get_attns=False, attn_requests=None,
                 embeddings_list=None):
-        # several parameters to be compatible with lm.py expectations, but not
+        # attn parameters to be compatible with lm.py expectations, but not
         # actually to be used:
         assert not get_attns, get_attns
         assert None is attn_requests, attn_requests
-        assert None is embeddings_list, embeddings_list
         # x: batch size X seq len X input dim
         xx, state0 = self.check_cache(x)
         out, staten = self.layers(xx, state0)
         # out shape: batch size X seq len X model dim
+        if None is not embeddings_list:
+            # list of batch size X seq len X model dim values, from each layer
+            embeddings_list.append(out)
+            # for an RNN, the embeddings "list" will only contain the top layer
+            # embedding. for now, this is all i need anyway, and pytorch
+            # doesnt make it convenient to get more than that
         self.store_cache(x, staten)
         return out, None  # None is placeholder for where the attentions
         # would be if this were a transformer - it is here for compatibility
