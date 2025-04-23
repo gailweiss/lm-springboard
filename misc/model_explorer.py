@@ -150,21 +150,24 @@ def refine_model_ids_choice(all_ids, subfolder_substr=None,
                 diff_vals[mdc] = {i: v for i, v in enumerate(vals)}
                 mdc += 1
     if meaningful_diffs:
+        print(f"currently have {len(all_ids)} models")
         print("found training logs had differences on keys:")
         print(meaningful_diffs)
         refine = constrained_input("refine? y/n: ", "yn") == "y"
         if refine:
-            k = int(constrained_input("which key? (enter number): ",
+            k = int(constrained_input("which key?" +\
+                                      "(enter number, or n to cancel): ",
                                       list(map(str, meaningful_diffs.keys()))))
-            p, attr = meaningful_diffs[k]
-            print("selected:", p, attr)
-            print("vals are:", diff_vals[k])
-            i = int(constrained_input(
-                "restrict to which val? (enter number): ",
-                list(map(str, diff_vals[k].keys()))))
-            v = diff_vals[k][i]
-            all_ids = [mid for mid in all_ids if
-                       getattr(get_info(mid)["params"][p], attr) == v]
+            if k != "n":
+                p, attr = meaningful_diffs[k]
+                print("selected:", p, attr)
+                print("vals are:", diff_vals[k])
+                i = int(constrained_input(
+                    "restrict to which val? (enter number): ",
+                    list(map(str, diff_vals[k].keys()))))
+                v = diff_vals[k][i]
+                all_ids = [mid for mid in all_ids if
+                           getattr(get_info(mid)["params"][p], attr) == v]
             return refine_model_ids_choice(
                 all_ids, allowed_differences=allowed_differences)
     return all_ids

@@ -170,6 +170,36 @@ def refine_ids_choice(args, all_ids, extra_allowed_differences):
         allowed_differences=allowed_differences)
 
 
+def select_ids(all_ids):
+    all_ids = sorted(list(all_ids))
+    def print_all_ids():
+        print(f"have {len(all_ids)} ids:\n\n")
+        for i, mid in enumerate(all_ids):
+            print(f"{i}:\t\t{mid}")
+    did_nothing = False
+    while(not did_nothing):
+        print_all_ids()
+        did_nothing = True
+        i = util.constrained_input("inspect id? int or n: ",
+            ["n"] + [str(i) for i in range(len(all_ids))])
+        if i != "n":
+            did_nothing = False
+            i = int(i)
+            p = me.get_info(all_ids[i], with_train_stats=False)["params"]
+            p = ps2ds(p)
+            print(f"{i}:\t\t{all_ids[i]}\n")
+            for pn, pd in p.items():
+                print(f"\n{pn}:\n")
+                util.print_nicely_nested(pd)
+        i = util.constrained_input("remove id? int or n: ",
+            ["n"] + [str(i) for i in range(len(all_ids))])
+        if i != "n":
+            did_nothing = False
+            i = int(i)
+            all_ids = all_ids[:i] + all_ids[i:]
+    return all_ids
+
+
 def setup(args, desc, extra_allowed_differences, ids_filter, stylists,
           type_name):
     plot_tracker.hide_plot_ids = args.hide_plot_ids
@@ -177,6 +207,7 @@ def setup(args, desc, extra_allowed_differences, ids_filter, stylists,
         desc, min_date=args.min_date, max_date=args.max_date,
         matching_datamodule_id=args.d_id)
     all_ids = refine_ids_choice(args, all_ids, extra_allowed_differences)
+    all_ids = select_ids(all_ids)
     if None is not ids_filter:
         all_ids = ids_filter(args, all_ids)
     print("found", len(all_ids), "relevant models matching the description")
