@@ -41,7 +41,7 @@ class RNN(nn.Module):
         # actual output as expected. but because never train
         # with batch size 1 and even if doing so unlikely to
         # be training with extension of previous batch (ie no prefix match),
-        # never really hit this issue        
+        # never really hit this issue
         assert len(x.shape) == 3
         if x.shape[0] == 1:  # batch size 1
             self.cache_x = x
@@ -61,11 +61,12 @@ class RNN(nn.Module):
             xnew = x[:, cache_l:, :]
             if torch.equal(xpref, self.cache_x):
                 return xnew, self.cache_state
-        h = self.h0.repeat(batch_size, 1, 1).transpose(0, 1)
+        # note: torch rnns need contiguous input and states
+        h = self.h0.repeat(batch_size, 1, 1).transpose(0, 1).contiguous()
         # n layers X batch size X state dim
         state = h
         if self.model_params.layer_architecture == "torch-lstm":
-            c = self.c0.repeat(batch_size, 1, 1).transpose(0, 1)
+            c = self.c0.repeat(batch_size, 1, 1).transpose(0, 1).contiguous()
             state = (h, c)
         return x, state
 
