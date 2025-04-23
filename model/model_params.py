@@ -21,8 +21,10 @@ class ModelParams:
 
 def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
             verbose=True, **d):
-    if d["layer_architecture"] in ["torch-lstm", "torch-gru"]:
-        assert d["pos_encoding"] == "none", d["pos_encoding"]
+    defaults = ModelParams()
+    if d.get("layer_architecture", defaults.layer_architecture) in \
+        ["torch-lstm", "torch-gru"]:
+        assert d["pos_encoding"] == "none", (d["pos_encoding"], d)
     return apply_dataclass(ModelParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples,
                            verbose=verbose, takes_extras=takes_extras)
