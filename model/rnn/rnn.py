@@ -59,7 +59,7 @@ class RNN(nn.Module):
             cache_l = self.cache_x.shape[1]
             xpref = x[:, :cache_l, :]
             xnew = x[:, cache_l:, :]
-            if torch.equal(xpref, self.cache_x):
+            if torch.equal(xpref, self.cache_x.to(device=xpref.device)):
                 return xnew, self.cache_state
         # note: torch rnns need contiguous input and states
         h = self.h0.repeat(batch_size, 1, 1).transpose(0, 1).contiguous()
