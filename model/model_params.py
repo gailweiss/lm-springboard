@@ -7,6 +7,7 @@ class ModelParams:
     n_layers: int = 8
     n_heads: int = 8
     dim: int = 256
+    rnn_x_dim: int = -1
     dim_ff_factor: int = 2
     max_seq_len: int = 200  # (in tokens)
     tokenizer_source_name: str = "custom"
@@ -20,6 +21,8 @@ class ModelParams:
 
 def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
             verbose=True, **d):
+    if d["layer_architecture"] in ["torch-lstm", "torch-gru"]:
+        assert d["pos_encoding"] == "none", d["pos_encoding"]
     return apply_dataclass(ModelParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples,
                            verbose=verbose, takes_extras=takes_extras)
@@ -39,7 +42,11 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 # n_heads:
 #   Number of heads per layer in the transformer model.
 # dim:
-#   Embedding width - input and model layer embedding dimension
+#   Embedding width - input and model layer embedding dimension. In case
+#   the architecture is an RNN, this is the dimenstion of the hidden state.
+# rnn_x_dim:
+#   Relevant only for RNNs - the input embedding dimension. Default -1, in
+#   which case it is equal to dim.
 # dim_ff_factor:
 #   How much wider each transformer layer's feedforward hidden dimension is
 #   than the input embedding dimension, e.g. with dim=256 and dim_ff_factor=2,
@@ -80,6 +87,8 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #           torch.nn.TransformerEncoderLayer for each layer of the transformer.
 #           Optimisations gone in favour of keeping implementation in python -
 #           hence customisable. The relevant files are in model/transformer/.
+#       "torch-lstm", "torch-gru":
+#           Use torch.nn.LSTM and torch.nn.GRU, respectively
 # from_os_pretrained:
 #   If not empty, load an open source pretrained model as the initial model
 #   state. Except for max_seq_len, all arguments describing the model

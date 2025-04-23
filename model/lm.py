@@ -19,8 +19,14 @@ class LM(nn.Module):
             self.de_embedder = None
         else:
             assert not self.model_params.from_os_pretrained
+            if self.model_params.layer_architecture in ["torch-lstm", "torch-gru"]:
+                assert self.model_params.pos_encoding == "none"
+                x_dim = model_params.dim if model_params.rnn_x_dim == -1 \
+                        else model_params.rnn_x_dim
+            else:
+                x_dim = model_params.dim
             self.embed = FullEmbedding(
-                model_params.dim, self.n_tokens, model_params.max_seq_len,
+                x_dim, self.n_tokens, model_params.max_seq_len,
                 positional_encoding_type=model_params.pos_encoding)
             self.de_embedder = nn.Linear(self.model_params.dim, self.n_tokens)
         self.tokenizer = tokenizer
@@ -41,6 +47,9 @@ class LM(nn.Module):
         return next(self.parameters()).device
 
     def _sample(self, indices, max_seq_len, temperature, top_k, nucleus):
+        was_training = self.training
+        self.eval()
+
         eos = self.tokenizer.eos()
 
         max_seq_len = min(max_seq_len, self.model_params.max_seq_len)
@@ -61,6 +70,9 @@ class LM(nn.Module):
             next_t = choose_output_index(e[0, -1, :], temperature=temperature,
                                          top_k=top_k, nucleus=nucleus)
             indices.append(next_t)
+
+        if was_training:
+            self.train()
 
         return indices
 
@@ -95,10 +107,8 @@ class LM(nn.Module):
             indices = self.tokenizer.tokenize_without_stop(pref)
         else:
             indices = pref
-
         indices = self._sample(indices, max_seq_len, temperature, top_k,
                                nucleus)
-
         if as_str:
             return self.tokenizer.convert_ids_to_nice_string(indices)
         else:

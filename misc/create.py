@@ -2,6 +2,7 @@ from data.dataloader import get_data, LMDataModule, datamodules_paths
 from data.syntheticdata import SyntheticSamplesIterator
 from model.tokenizer import MyTokenizer
 from model.transformer.transformer import Transformer
+from model.rnn.rnn import RNN
 from model.lm import LM
 from misc.gpt2 import get_gpt2
 import dataclasses
@@ -57,6 +58,8 @@ def make_datamodule(data_params, model_params, verbose=True,
 def make_model(model_params, train_params, tokenizer):
     if "transformer" in model_params.layer_architecture:
         model = Transformer(model_params, train_params)
+    elif model_params.layer_architecture in ["torch-lstm", "torch-gru"]:
+        model = RNN(model_params, train_params)
     else:  # hoping to add e.g. RNNs, S6, etc in the future
         raise Exception("unknown layer_architecture:" +
                         f"{model_params.layer_architecture}")
