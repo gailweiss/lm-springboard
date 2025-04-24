@@ -49,6 +49,8 @@ class LM(nn.Module):
     def _sample(self, indices, max_seq_len, temperature, top_k, nucleus):
         was_training = self.training
         self.eval()
+        print("sampling with temperature:", temperature,
+              "and max length:", max_seq_len)
 
         eos = self.tokenizer.eos()
 
