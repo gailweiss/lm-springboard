@@ -8,9 +8,10 @@ from misc.util import printer_print as print
 
 
 class LM(nn.Module):
-    def __init__(self, tokenizer, model, model_params):
+    def __init__(self, tokenizer, model, model_params, train_params):
         super().__init__()
         self.model_params = model_params
+        self.train_params = train_params
         self.decoder = model
         self.n_tokens = tokenizer.vocab_size()
         if True in [n in self.model_params.from_os_pretrained for 
@@ -27,7 +28,8 @@ class LM(nn.Module):
                 x_dim = model_params.dim
             self.embed = FullEmbedding(
                 x_dim, self.n_tokens, model_params.max_seq_len,
-                positional_encoding_type=model_params.pos_encoding)
+                positional_encoding_type=model_params.pos_encoding,
+                dropout=train_params.dropout)
             self.de_embedder = nn.Linear(self.model_params.dim, self.n_tokens)
         self.tokenizer = tokenizer
         self.tested_manual_forward = False

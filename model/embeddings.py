@@ -76,16 +76,15 @@ class PositionalEmbedding(nn.Module):
 
 
 class FullEmbedding(nn.Module):
-    def __init__(self, d_model, num_tokens, max_len, positional_dropout=0.0,
+    def __init__(self, d_model, num_tokens, max_len, dropout=0.0,
                  positional_encoding_type='learned', separate_encodings=False):
         super(FullEmbedding, self).__init__()
-
+        self.dropout = nn.Dropout(p=dropout)
         position_modules = {'sin': PositionalEncoding,
                             'learned': PositionalEmbedding,
                             'none': NoEmbedding}
         position_module = position_modules[positional_encoding_type]
-        positional_encoding = position_module(d_model, positional_dropout,
-                                              max_len=max_len)
+        positional_encoding = position_module(d_model, max_len=max_len)
 
         word_embedding = nn.Embedding(num_tokens, d_model)
         nn.init.normal_(word_embedding.weight, mean=0.0, std=0.02,
@@ -118,4 +117,4 @@ class FullEmbedding(nn.Module):
         # and now return to the batch_size X seq_len X embed dim (and if
         # separate encodings: X 2 ) shape expected by our new calling functions
         res = res.transpose(0, 1)
-        return res
+        return self.dropout(res)

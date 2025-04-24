@@ -80,5 +80,5 @@ def get_pythia(chkpt_id=0, sizestr="70m", deduped=True, cap_max_seq_len=-1):
     model_params.tokenizer_source_name = tokenizerstr
 
     tokenizer = MyTokenizer(data=None, name=tokenizerstr, no_crop=True)
-    lm = LM(tokenizer, gptneox, model_params)
+    lm = LM(tokenizer, gptneox, model_params, None)
     return lm

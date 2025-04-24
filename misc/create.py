@@ -64,7 +64,7 @@ def make_model(model_params, train_params, tokenizer):
         raise Exception("unknown layer_architecture:" +
                         f"{model_params.layer_architecture}")
 
-    lm = LM(tokenizer, model, model_params)
+    lm = LM(tokenizer, model, model_params, train_params)
 
     if train_params.lora_rank > 0:
         apply_lora_to_model(lm, train_params)

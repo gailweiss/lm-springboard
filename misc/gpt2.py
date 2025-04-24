@@ -50,5 +50,5 @@ def get_gpt2(cap_max_seq_len=-1):
     model_params.individual_head_params = False
 
     tokenizer = MyTokenizer(data=None, name="gpt2", no_crop=True)
-    lm = LM(tokenizer, gpt2, model_params)
+    lm = LM(tokenizer, gpt2, model_params, None)
     return lm
