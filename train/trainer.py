@@ -210,10 +210,15 @@ class Trainer(pl.LightningModule):
     def maybe_step_opt_and_lr(self, batch_idx):
         if (batch_idx + 1) % self.train_params.accumulate_grad_batches == 0:
             opt = self.optimizers()
+            self.log_stat("gradient_norms unclipped", self.get_gradient_norms())
             self.clip_gradients(
                 opt, gradient_clip_val=self.train_params.gradient_clip_val,
                 gradient_clip_algorithm="norm")
+            self.log_stat("gradient_norms clipped", self.get_gradient_norms())
+            p0 = self.get_full_params()
             opt.step()
+            p1 = self.get_full_params()
+            self.log_stat("step norm", (p1 - p0).detach().norm(2))
             opt.zero_grad()
             sched = self.lr_schedulers()
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
@@ -320,6 +325,19 @@ class Trainer(pl.LightningModule):
             total_norm += param_norm.item() ** 2
         total_norm = total_norm ** 0.5
         return total_norm
+
+    def get_gradient_norms(self):
+        total_norm = 0
+        for p in self.model.parameters():
+            if p.grad is not None and p.requires_grad:
+                grad_norm = p.grad.detach().data.norm(2)
+                total_norm += grad_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+        return total_norm
+
+    def get_full_params(self):
+        all_params = tuple([p.detach().view(-1) for p in self.model.parameters()])
+        return torch.cat(all_params)
 
 
 class MyChainedScheduler:
