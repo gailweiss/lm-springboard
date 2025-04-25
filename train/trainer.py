@@ -218,7 +218,7 @@ class Trainer(pl.LightningModule):
             p0 = self.get_full_params()
             opt.step()
             p1 = self.get_full_params()
-            self.log_stat("step norm", (p1 - p0).detach().norm(2))
+            self.log_stat("step norm", (p1 - p0).detach().norm(2).item())
             opt.zero_grad()
             sched = self.lr_schedulers()
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
