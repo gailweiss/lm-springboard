@@ -349,7 +349,7 @@ get_model_cache = {}
 
 
 def get_model_by_identifier(identifier, checkpoint=final_chkpt, verbose=True,
-                            with_data=True, cache=False):
+                            with_data=False, cache=False):
     cache_identifier = (identifier, checkpoint, with_data)
     if cache:
         if cache_identifier in get_model_cache:
