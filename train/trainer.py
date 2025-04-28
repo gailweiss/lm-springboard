@@ -162,9 +162,14 @@ class Trainer(pl.LightningModule):
         self.log_stat("n_active_params", n_active_params)
         self.log_time()
 
+    def slow_log_time(self):
+        return (self.n_opt_steps % self.train_params.slower_log_freq) == 0
+
+    def extra_log_time(self):
+        return self.train_params.extra_tracking and self.slow_log_time()
+
     def maybe_log_hyperparams_and_time(self):
-        freq = self.train_params.hyperparams_log_freq
-        if self.n_opt_steps % freq == 0:
+        if self.slow_log_time():
             self.log_hyperparams_and_time()
 
     def on_train_batch_start(self, batch, batch_idx):
@@ -198,8 +203,9 @@ class Trainer(pl.LightningModule):
             self.log_stat("n_epochs", self.curr_epoch)
             self.logged_epoch_count_yet = True
         self.log_stat("n_opt_steps", self.n_opt_steps)
-        self.log_stat("weight_norms", self.get_weight_norms())
-
+        if self.extra_log_time():
+            d = self.get_weight_norms()
+            [self.log_stat(f"weight_norms/{n}", v) for n, v in d.items()]
         self.manual_backward(losses["main"])
         self.maybe_step_opt_and_lr(batch_idx)
         # update counters *after* logs, for more logical record:
@@ -210,15 +216,25 @@ class Trainer(pl.LightningModule):
     def maybe_step_opt_and_lr(self, batch_idx):
         if (batch_idx + 1) % self.train_params.accumulate_grad_batches == 0:
             opt = self.optimizers()
-            self.log_stat("gradient_norms unclipped", self.get_gradient_norms())
+            if self.extra_log_time():
+                d = self.get_gradient_norms()
+                [self.log_stat(f"gradient_norms unclipped/{n}", v) for
+                 n, v in d.items()]
             self.clip_gradients(
                 opt, gradient_clip_val=self.train_params.gradient_clip_val,
                 gradient_clip_algorithm="norm")
-            self.log_stat("gradient_norms clipped", self.get_gradient_norms())
-            p0 = self.get_full_params()
+            if self.extra_log_time():
+                d = self.get_gradient_norms()
+                [self.log_stat(f"gradient_norms clipped/{n}", v) for
+                 n, v in d.items()]
+            if self.extra_log_time():
+                p0 = self.get_full_params()
             opt.step()
-            p1 = self.get_full_params()
-            self.log_stat("step norm", (p1 - p0).detach().norm(2).item())
+            if self.extra_log_time():
+                p1 = self.get_full_params()
+                for v in p0:
+                    self.log_stat(f"step norm/{v}",
+                                  (p1[v] - p0[v]).detach().norm(2).item())
             opt.zero_grad()
             sched = self.lr_schedulers()
             sched.step(self.trainer.callback_metrics["train_batch_loss"])
@@ -319,25 +335,27 @@ class Trainer(pl.LightningModule):
         return [optimizer], [s_main]
 
     def get_weight_norms(self):
-        total_norm = 0
-        for p in self.model.parameters():
-            param_norm = p.data.norm(2)
-            total_norm += param_norm.item() ** 2
-        total_norm = total_norm ** 0.5
-        return total_norm
+        res = {n: p.data.norm(2).item() for n, p in
+                     self.model.named_parameters()}
+        assert "full" not in res, res.keys()
+        res["full"] = sum(v ** 2 for v in res.values()) ** 0.5
+        return res
 
     def get_gradient_norms(self):
-        total_norm = 0
-        for p in self.model.parameters():
-            if p.grad is not None and p.requires_grad:
-                grad_norm = p.grad.detach().data.norm(2)
-                total_norm += grad_norm.item() ** 2
-        total_norm = total_norm ** 0.5
-        return total_norm
+        res = {n: p.grad.detach().data.norm(2).item() for n, p in
+                     self.model.named_parameters()}
+        assert "full" not in res, res.keys()
+        res["full"] = sum(v ** 2 for v in res.values()) ** 0.5
+        return res
 
     def get_full_params(self):
-        all_params = tuple([p.detach().view(-1) for p in self.model.parameters()])
-        return torch.cat(all_params)
+        all_params = [(n, p.detach().view(-1).clone()) for n, p in
+                      self.model.named_parameters()]
+        # clone else it just makes a reference it seems
+        res = {n: p for n, p in all_params}
+        assert "full" not in res
+        res["full"] = torch.cat(tuple(p for n, p in all_params))
+        return res
 
 
 class MyChainedScheduler:

@@ -13,7 +13,7 @@ class TrainParams:
     max_sample_tokens: int = 30
     sample_temperature: float = 1
     no_wandb: bool = False
-    hyperparams_log_freq: int = 100
+    slower_log_freq: int = 10
     lr: float = 1e-3
     lr_warm_steps: int = 50
     lr_scheduler_type: str = 'Cosine'
@@ -27,6 +27,7 @@ class TrainParams:
     early_stop_nsamples: int = -1
     weight_decay: float = 0.01
     random_seed: int = None
+    extra_tracking: bool = False
 
 
 def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
@@ -67,9 +68,10 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 # no_wandb:
 #   Optionally turn off wandb logging. wandb only runs if this is False and
 #   also --no-wandb has not been passed to the main.py call
-# hyperparams_log_freq:
-#   Of wandb is on, how often to record some additional statistics of the
-#   training, e.g. the number of trainable model parameters.
+# slower_log_freq:
+#   If wandb is on, how often to record some additional statistics of the
+#   training, e.g. the number of trainable model parameters, or "extra"
+#   tracked info (see extra_tracking)
 # lr:
 #   Defines the 'main' learning rate, see different scheduler types for
 #   details.
@@ -122,3 +124,7 @@ def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 # random_seed:
 #   Random seed for reproducibility. This value can also be overwritten by
 #   setting the random seed arg in the main.py script.
+# extra_tracking:
+#   Track some additional statistics on how training is going, in particular:
+#   weight norms, gradient norms, step norms. Will only be logged every
+#   slower_log_freq batches
