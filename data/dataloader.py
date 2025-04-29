@@ -50,7 +50,7 @@ def get_local_datafolder(n):
 def get_data(data_params):
     lang_counters = None
     if data_params.dataset_name == "dummy":
-        samples = verysimplesamplesreader(".", data_params)
+        samples = verysimplesamplesreader("data", data_params)
     elif data_params.dataset_name == "wikitext":
         samples = wikitextloader()
     elif data_params.dataset_name == "ptb":
@@ -433,6 +433,7 @@ def verysimplesamplesreader(path, data_params):
     paths = glob_nosquares(f"{path}/*.txt")
     all_samples = []
     for p in paths:
+        print("loading samples from:", p)
         with open(p, "r") as f:
             all_lines = f.readlines()
         if data_params.lines_per_sample < 0:
@@ -441,6 +442,8 @@ def verysimplesamplesreader(path, data_params):
             for i in range(0, len(all_lines), data_params.lines_per_sample):
                 all_samples.append("".join(
                     all_lines[i: i + data_params.lines_per_sample]))
+    all_samples = [s.replace("\n","") for s in all_samples]
+    print(f"loaded {len(all_samples)} samples overall")
     return all_samples
 
 
