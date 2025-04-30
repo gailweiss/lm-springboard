@@ -133,7 +133,7 @@ def _layer_forward(layer, x, src_mask, skip_test=False):
     if layer.norm_first:
         attn_res, attn_pattern = _sa_block(layer, layer.norm1(x), src_mask)
         x = x + attn_res
-        x = x + later._ff_block(layer.norm2(x))
+        x = x + layer._ff_block(layer.norm2(x))
     else:
         attn_res, attn_pattern = _sa_block(layer, x, src_mask)
         x = layer.norm1(x + attn_res)
