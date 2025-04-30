@@ -32,9 +32,11 @@ class TrainParams:
 
 def make_tp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
             verbose=True, **d):
+    name_changes = [("hyperparams_log_freq", "slower_log_freq")]
     return apply_dataclass(TrainParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples,
-                           verbose=verbose, takes_extras=takes_extras)
+                           verbose=verbose, takes_extras=takes_extras,
+                           name_changes=name_changes)
     # ready for fixes over time
 
 
