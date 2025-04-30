@@ -15,7 +15,7 @@ from copy import deepcopy
 class TransformerEncoderLayer(nn.Module):
     def __init__(self, model_params, train_params,
                  activation=nn.functional.relu, layer_norm_eps=1e-5,
-                 batch_first=False, norm_first=False, bias=True):
+                 batch_first=False, bias=True):
         super().__init__()
         self.model_params = model_params
         train_params = deepcopy(train_params)
@@ -30,7 +30,7 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout_ff_internal = Dropout(train_params.dropout)
         self.linear2 = Linear(dim_feedforward, d_model, bias=bias)
 
-        self.norm_first = norm_first
+        self.norm_first = model_params.norm_first
         self.norm1 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
         self.norm2 = LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
         self.dropout_sa = Dropout(train_params.dropout)

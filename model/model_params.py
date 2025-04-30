@@ -18,6 +18,7 @@ class ModelParams:
     individual_head_params: bool = False
     pos_encoding: str = "learned"
     tie_embed_deembed: bool = False
+    norm_first: bool = False
 
 
 def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
@@ -132,3 +133,7 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #           in the original transformer paper, "Attention is all you need".
 # tie_embed_deembed:
 #   Whether to tie the weights of the embedding and deembedding layers.
+# norm_first:
+#   For torch-transformer and custom-transformer architectures: whether to
+#   use pre- or post- normalisation in the transformer layers. Default
+#   False to align with older models

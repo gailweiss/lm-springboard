@@ -2,34 +2,45 @@ import torch
 import torch.nn as nn
 from model.transformer.transformerencoderlayer import TransformerEncoderLayer
 from misc.util import printer_print as print
+from torch.nn.modules.normalization import LayerNorm
 
 
 class Transformer(nn.Module):
-    def __init__(self, model_params, train_params):
+    def __init__(self, model_params, train_params, layer_norm_eps=1e-5,
+                 bias=True):
+
         super().__init__()
         self.model_params = model_params
-
+        batch_first = True  # I always do batch first
         def make_layer():
-            batch_first = True  # i always do batch first
             if model_params.layer_architecture == "custom-transformer":
                 return TransformerEncoderLayer(self.model_params,
                                                train_params,
-                                               batch_first=batch_first)
+                                               batch_first=batch_first,
+                                               layer_norm_eps=layer_norm_eps,
+                                               bias=bias)
             elif model_params.layer_architecture == "torch-transformer":
                 dim_ff = self.model_params.dim * \
                          self.model_params.dim_ff_factor
                 return nn.TransformerEncoderLayer(
                             dropout=train_params.dropout,
-                            d_model=self.model_params.dim,
-                            nhead=self.model_params.n_heads,
-                            dim_feedforward=dim_ff, batch_first=batch_first)
+                            d_model=model_params.dim,
+                            nhead=model_params.n_heads,
+                            norm_first=model_params.norm_first,
+                            dim_feedforward=dim_ff, batch_first=batch_first,
+                            layer_norm_eps=layer_norm_eps, bias=bias)
             else:
                 raise Exception("unknown layer_architecture:" +
                                 f"{model_params.layer_architecture}")
         self.layers = nn.ModuleList([make_layer() for _ in
                                      range(self.model_params.n_layers)])
+        if self.model_params.norm_first:
+            self.normf = LayerNorm(model_params.dim,
+                                   eps=layer_norm_eps, bias=bias)
 
     def not_layernorm(self, param_name):
+        if ".normf." in param_name:
+            return False
         if self.model_params.layer_architecture == "torch-transformer":
             return ".norm1." not in param_name and ".norm2." not in param_name
         if self.model_params.layer_architecture == "custom-transformer":
@@ -51,7 +62,9 @@ class Transformer(nn.Module):
         # batch size X seq len X embed dim
         mask = self.causal_mask(x.shape[1], x.device, x.dtype)
         attns = []
-        for layer in self.layers:
+        last_layer_done = False
+        for i, layer in enumerate(self.layers):
+            assert not last_layer_done, (i, self.model_params)
             if self.model_params.layer_architecture == "custom-transformer":
                 x, attn = layer(x, src_mask=mask, attn_requests=attn_requests)
                 attns.append(attn)
@@ -64,9 +77,15 @@ class Transformer(nn.Module):
             else:
                 raise Exception("unknown layer_architecture: " +
                                 f"{self.model_params.layer_architecture}")
+            if i == (self.model_params.n_layers - 1):  # last layer
+                last_layer_done = True
+                if self.model_params.norm_first:
+                    x = self.normf(x)
             if None is not embeddings_list:
                 embeddings_list.append(x)
                 # accessed outside - lists get mutated
+        assert last_layer_done  # just making sure ive got layer count right,
+        # can remove all last_layer_done refs in future
         attns = torch.stack(attns).transpose(0, 1) if attns else None
         # attns shape: batch size, n layers, n heads, seq len, seq len
         # x shape: batch size X seq len X embed dim
