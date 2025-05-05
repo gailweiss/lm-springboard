@@ -390,9 +390,9 @@ def c4loader(data_params):
     val_frac = data_params.val_pct / 100
     test_frac = data_params.test_pct / 100
     train_frac = 1 - (val_frac + test_frac)
-    n_train_fullsamples = int(total_load * train_frac)
-    n_val_fullsamples = int(total_load * val_frac)
-    n_test_fullsamples = int(total_load * test_frac)
+    n_val_fullsamples = max(int(total_load * val_frac), 1)
+    n_test_fullsamples = max(int(total_load * test_frac), 1)
+    n_train_fullsamples = total_load - (n_val_fullsamples + n_test_fullsamples)
     res = {}
     res["train"] = [next(train_d)["text"] for _ in range(n_train_fullsamples)]
     val_and_test = [next(val_d)["text"] for _ in range(n_val_fullsamples +
@@ -548,9 +548,9 @@ def finewebloader(data_params):
     val_frac = data_params.val_pct / 100
     test_frac = data_params.test_pct / 100
     train_frac = 1 - (val_frac + test_frac)
-    n_train_fullsamples = int(total_load * train_frac)
-    n_val_fullsamples = int(total_load * val_frac)
-    n_test_fullsamples = int(total_load * test_frac)
+    n_val_fullsamples = max(int(total_load * val_frac), 1)
+    n_test_fullsamples = max(int(total_load * test_frac), 1)
+    n_train_fullsamples = total_load - (n_val_fullsamples + n_test_fullsamples)
     fullnumbers = [n_train_fullsamples, n_val_fullsamples, n_test_fullsamples]
     print("working with data_params:", data_params)
     print("so want to get train/val/test amounts:", fullnumbers)

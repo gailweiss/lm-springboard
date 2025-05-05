@@ -46,7 +46,11 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
 def synthetic_task_flag(data_params):
     if syntheticdatasets.has_dataset(data_params.dataset_name):
         return "synthetic"
-    if "fineweb" in data_params.dataset_name and len(data_params.langs) > 1:
+    if "fineweb" in data_params.dataset_name:
+        # removing "and len(data_params.langs) > 1" because it's still
+        # going to go through the whole multilingual process here, just the
+        # number ends up being 1 (and noting that it's gone through this
+        # process is more convenient for my logic downstream)
         return "multilingual natural"
     return "plain natural"
 
