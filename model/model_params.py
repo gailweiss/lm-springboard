@@ -10,6 +10,7 @@ class ModelParams:
     rnn_x_dim: int = -1
     dim_ff_factor: int = 2
     max_seq_len: int = 200  # (in tokens)
+    crop_tokenizer: bool = True
     tokenizer_source_name: str = "custom"
     custom_tokenizer_ntokens: int = 20000
     layer_architecture: str = "torch-transformer"
@@ -60,6 +61,11 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #   fine tuning will only affect the fine-tuning dataset, in this case using:
 #       min(max_seq_len, Mp) if max_seq_len <= 0 else Mp
 #   where Mp is the max_seq_len of the pretrained model being finetuned.
+# crop_tokenizer:
+#   When using a loaded tokenizer (eg from huggingface), whether to crop it
+#   only to observed tokens (to allow making smaller models). In practice
+#   probably better to avoid, to allow easily using the same model on multiple
+#   different datasets without having to make adaptations
 # tokenizer_source_name:
 #   Specifies how to prepare the tokenizer. in all cases, the optimizer is
 #   adapted to some extent according to the dataset the model is created with.

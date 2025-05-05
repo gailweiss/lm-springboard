@@ -598,7 +598,8 @@ def same_characteristics(identifiers, mp=True, tp=True, dp=True,
 def find_existing_datamodule_path(data_params, model_params, verbose=True):
     def is_match(dpd, mpd, notes):
         # all the attrs that determine the dataset and the tokenizer
-        important_model_attrs = ["max_seq_len", "tokenizer_source_name"]
+        important_model_attrs = ["max_seq_len", "tokenizer_source_name",
+                                 "crop_tokenizer"]
         important_data_attrs = ["dataset_name", "debug_crop",
                                 "breaking_synthetic_samples_ok",
                                 "val_pct", "test_pct", "lines_per_sample",
@@ -654,6 +655,10 @@ def find_existing_datamodule_path(data_params, model_params, verbose=True):
                 mpd = json.load(f)
                 mpd = {k: tuple(v) if isinstance(v, list) else v for
                        k, v in mpd.items()}
+                if "crop_tokenizer" not in mpd:
+                    # default value for all datasets until now, so have
+                    # to reflect this
+                    mpd["crop_tokenizer"] = True 
             with open(path_join(path, "data_params.json"), "r") as f:
                 dpd = json.load(f)
                 dpd = {k: tuple(v) if isinstance(v, list) else v for

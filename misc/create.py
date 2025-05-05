@@ -39,7 +39,8 @@ def make_datamodule(data_params, model_params, verbose=True,
         tokenizer = MyTokenizer(remove_type_markers(as_iterable(plain_data)),
                                 name=model_params.tokenizer_source_name,
                                 custom_vocab_size=custom_tokenizer_ntokens,
-                                verbose_init=verbose)
+                                verbose_init=verbose,
+                                no_crop=not model_params.crop_tokenizer)
 
     # 3. make a data module, with the tokenizer.
     # this one does take the true data, to maintain the train/val/test split
