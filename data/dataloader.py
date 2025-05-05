@@ -569,9 +569,9 @@ def finewebloader(data_params):
         actual_nums = {n: len(res[n]) for n in res}
         actual_nums["total"] = sum(list(actual_nums.values()))
         print(f"\n\n{relation} balancing, got # samples: {actual_nums}")
-        print(f"{relation} balancing, val pct is:",
+        print(f"{relation} balancing, val frac is:",
               actual_nums["validation"] / actual_nums["total"])
-        print(f"{relation} balancing, test pct is:",
+        print(f"{relation} balancing, test frac is:",
               actual_nums["test"] / actual_nums["total"])
 
     print_sample_counts("before")
