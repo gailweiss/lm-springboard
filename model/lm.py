@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from misc.util import pick_index_from_distribution, timed
 from model.embeddings import FullEmbedding
-from data.dataloader import mycollate, DataLoader
+from torch.utils.data import DataLoader
+from data.dataloader import mycollate
 from tqdm import tqdm
 from misc.util import printer_print as print
 
@@ -151,6 +152,8 @@ class LM(nn.Module):
                 return None
             if isinstance(dl[0], str):
                 dl = self.tokenizer(dl)
+                dl = [(len(s), torch.Tensor(s).to(device=self.device()).long())
+                      for s in dl]  # the format mycollate expects
             dl = DataLoader(dl, batch_size=batch_size, shuffle=False,
                             collate_fn=mycollate)
 
@@ -181,7 +184,9 @@ class LM(nn.Module):
         if per_token_res:
             per_token_res = cat_with_dim1_pad(per_token_res)
         res = {"mean": mean_l, "max": max_l, "min": min_l,
-               "total_preds": total_preds, "per_token_res": per_token_res}
+               "total_preds": total_preds, "per_token_res": per_token_res,
+               "dl": dl}
+        # returns dl in case made one specially here
         return res
 
     def get_batch_xyz(self, batch, loss_requests=None):

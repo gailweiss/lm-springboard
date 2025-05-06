@@ -472,7 +472,7 @@ def mycollate(b):
     mask = torch.ones(batch_indices.shape, dtype=dtype) if with_mask else None
 
     for i, (n, seq) in enumerate(b):
-        batch_indices[i] = seq[:seqlen]
+        batch_indices[i][:n] = seq[:n]
         if with_mask:
             mask[i][:n] = 0
         
