@@ -1,4 +1,5 @@
-from data.dataloader import get_data, LMDataModule, datamodules_paths
+from data.dataloader import get_data
+from data.datamodule import LMDataModule, datamodules_paths
 from data.syntheticdata import SyntheticSamplesIterator
 from model.tokenizer import MyTokenizer
 from model.transformer.transformer import Transformer

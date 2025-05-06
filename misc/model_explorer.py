@@ -11,7 +11,7 @@ from misc.util import printer_print as print
 import json
 import itertools
 from copy import deepcopy
-from data.dataloader import datamodules_paths, LMDataModule
+from data.datamodule import datamodules_paths, LMDataModule
 import os
 
 
