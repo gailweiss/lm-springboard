@@ -138,7 +138,7 @@ class Trainer(pl.LightningModule):
     def log_other_evals(self):
         if self.train_params.track_hellaswag:
             subset = "val"
-            self.log_stat(f"stat/hellaswag-{subset}",
+            self.log_stat(f"eval/hellaswag-{subset}",
                           hellaswag_eval(self.model, subset=subset))
 
     def record_type_stats(self, stats, recording_dict, from_train=False,
