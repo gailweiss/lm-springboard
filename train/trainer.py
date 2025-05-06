@@ -3,6 +3,7 @@ import torch
 import wandb
 from time import process_time
 from misc.util import printer_print as print
+from eval.hellaswag import hellaswag_eval
 
 
 class Trainer(pl.LightningModule):
@@ -131,7 +132,14 @@ class Trainer(pl.LightningModule):
                 print("couldn't print the sample here :(")
                 print(e)
             print("\n")
+        self.log_other_evals()
         self.maybe_save_checkpoint(after_val=True)
+
+    def log_other_evals(self):
+        if self.train_params.track_hellaswag:
+            subset = "val"
+            self.log_stat(f"stat/hellaswag-{subset}",
+                          hellaswag_eval(self.model, subset=subset))
 
     def record_type_stats(self, stats, recording_dict, from_train=False,
                           stat_name="loss"):
