@@ -5,6 +5,7 @@ from model.model_params import make_mp, ModelParams
 from model.lm import LM
 from train.trainer import Trainer
 from train.train_params import make_tp, TrainParams
+from eval.eval_params import make_ep, EvalParams
 import lightning as pl
 import argparse
 from dataclasses import asdict
@@ -66,8 +67,8 @@ class Namer:
         # ignored in base code, but may be useful in naming runs and save
         # folders when ablations are added
 
-    def set_config(self, dp, tp, mp):
-        self.dp, self.tp, self.mp = dp, tp, mp
+    def set_config(self, dp, tp, ep, mp):
+        self.dp, self.tp, self.ep, self.mp = dp, tp, ep, mp
         self.identifier = get_probably_unique()
 
     def wandb_proj_name(self):
@@ -115,9 +116,9 @@ def seed_everything(args_seed, tp):
     return seed
 
 
-def build_full(dp, tp, mp):
+def build_full(dp, tp, ep, mp):
     full = {}
-    for params, name in [(dp, "dp"), (tp, "tp"), (mp, "mp")]:
+    for params, name in [(dp, "dp"), (tp, "tp"), (ep, "ep"), (mp, "mp")]:
         for k, v in asdict(params).items():
             full[name + "." + k] = v
     return full
@@ -128,7 +129,8 @@ def read_config(config_filename):
         lines = [line.split("#")[0].strip() for line in f.readlines()]
         # drop comments, remove edge whitespace (doesn't seem to remove
         # internal whitespace though)
-    res = {n: {} for n in ["DataParams", "TrainParams", "ModelParams"]}
+    res = {n: {} for n in
+           ["DataParams", "TrainParams", "EvalParams", "ModelParams"]}
     curr_set = ""  # shouldnt get used
     for line in lines:
         if not line:
@@ -148,12 +150,13 @@ def get_params(config_filename):
     overwrites = read_config(config_filename)
     dp = make_dp(**overwrites["DataParams"], convert_lists_to_tuples=False)
     tp = make_tp(**overwrites["TrainParams"], convert_lists_to_tuples=False)
+    ep = make_ep(**overwrites["EvalParams"], convert_lists_to_tuples=False)
     mp = make_mp(**overwrites["ModelParams"], convert_lists_to_tuples=False)
-    assert None not in [dp, tp, mp]
-    return dp, tp, mp
+    assert None not in [dp, tp, ep, mp]
+    return dp, tp, ep, mp
 
 
-def train(args, lm, dataset, tp, dp, saving_folder):
+def train(args, lm, dataset, tp, ep, dp, saving_folder):
     # dp and saving_folder are for saving checkpoints
     assert lm.tokenizer is dataset.tokenizer, "mismatched tokenizers"
     tokenizer = lm.tokenizer
@@ -165,10 +168,10 @@ def train(args, lm, dataset, tp, dp, saving_folder):
         devices=1 if args.gpu_id is None else [args.gpu_id],  # only run on 1
         # device, else it runs all of main.py n_devices times (????).
         # presumably its for multi-gpu training but i haven't learned how yet
-        max_epochs=tp.epochs, val_check_interval=tp.val_check_epoch_frac)
+        max_epochs=tp.epochs, val_check_interval=ep.val_check_epoch_frac)
 
     tdl = dataset.train_dataloader(tp.batch_size)
-    mytrainer = Trainer(lm, tp,
+    mytrainer = Trainer(lm, tp, ep,
                         train_dataloader_nbatches=len(tdl),
                         start_time=start_time)
     mytrainer.prepare_saver(dp, saving_folder, save_model_)
@@ -188,8 +191,8 @@ def train(args, lm, dataset, tp, dp, saving_folder):
     return pltrainer
 
 
-def setup_wandb(args, tp, full_params, namer):
-    if not (tp.no_wandb or args.no_wandb):
+def setup_wandb(args, ep, full_params, namer):
+    if not (ep.no_wandb or args.no_wandb):
         run = wandb.init(entity=wandb_username,
                          project=namer.wandb_proj_name(),
                          config=full_params, name=namer.run_name(), dir="..")
@@ -206,8 +209,8 @@ def setup_wandb(args, tp, full_params, namer):
     return run, run_name, run_loc
 
 
-def finish_wandb(args, tp, run, run_loc):
-    if not (tp.no_wandb or args.no_wandb):
+def finish_wandb(args, ep, run, run_loc):
+    if not (ep.no_wandb or args.no_wandb):
         run.finish()
         sleep(10)  # give wandb 10 seconds to actually finish, this is
         # stupid but ugh i guess
@@ -226,22 +229,22 @@ def show_sample(lm):
         print("could not print this sample - got exception:\n", e)
 
 
-def save_model(args, saving_folder, pltrainer, dp, tp):
+def save_model(args, saving_folder, pltrainer, dp, tp, ep):
     mytrainer = pltrainer.model
     lm = mytrainer.model
     if args.save or args.save_stats:
         fn = f"{saving_folder}/{final_chkpt}"
         # make sure to use the updated model params after all this
-        save_model_(fn, pltrainer, mytrainer, lm.model_params, dp, tp,
+        save_model_(fn, pltrainer, mytrainer, lm.model_params, dp, tp, ep,
                     just_stats=not args.save)
         print(f"saved model {'' if args.save else ' stats'} in:\n", fn)
 
 
-def run_config(args, dp, tp, mp, namer):
+def run_config(args, dp, tp, ep, mp, namer):
     tp = deepcopy(tp)
     tp.random_seed = seed_everything(args.random_seed, tp)
-    full_params = build_full(dp, tp, mp)
-    run, run_name, run_loc = setup_wandb(args, tp, full_params, namer)
+    full_params = build_full(dp, tp, ep, mp)
+    run, run_name, run_loc = setup_wandb(args, ep, full_params, namer)
     saving_folder = f"../saved-models/{namer.save_folder_name(run_name)}"
     if args.save or args.save_stats:
         prepare_directory(saving_folder)
@@ -263,10 +266,10 @@ def run_config(args, dp, tp, mp, namer):
     # the original requested dp will still be available through
     # full_params, which is built at the top of this function and printed to
     # the log (above here: "print_nicely_nested(full_params)")
-    pltrainer = train(args, lm, dataset, tp, dp, saving_folder)
+    pltrainer = train(args, lm, dataset, tp, ep, dp, saving_folder)
     show_sample(pltrainer.model.model)
-    save_model(args, saving_folder, pltrainer, dp, tp)
-    finish_wandb(args, tp, run, run_loc)
+    save_model(args, saving_folder, pltrainer, dp, tp, ep)
+    finish_wandb(args, ep, run, run_loc)
 
     if args.save or args.save_stats:
         f.close()
@@ -297,16 +300,17 @@ def get_config_filenames(config_name):
     # before 5 unless its listed 05
 
 
-def run_all(args, dp, tp, mp, namer):
+def run_all(args, dp, tp, ep, mp, namer):
     # dp, tp, mp have been manipulated on the way here, remake to be sure
     dp = make_dp(**asdict(dp), redo_synth_eval=True)
     tp = make_tp(**asdict(tp))
     mp = make_mp(**asdict(mp))
+    ep = make_ep(**asdict(ep))
     namer.set_config_ablation("main")
-    namer.set_config(dp, tp, mp)
+    namer.set_config(dp, tp, ep, mp)
     if args.no_wandb:
-        tp.no_wandb = True  # else will have bugs
-    run_config(args, dp, tp, mp, namer)
+        ep.no_wandb = True  # else will have bugs
+    run_config(args, dp, tp, ep, mp, namer)
     if args.ablate:
         pass  # add ablations here
 
@@ -332,16 +336,17 @@ def run_main(arg_bits_list=None):
     config_index = 0
     run_all_args = []
     for filename in get_config_filenames(args.config):
-        dp, tp, mp = get_params(filename)
+        dp, tp, ep, mp = get_params(filename)
         if None is not args.task:
             dp.dataset_name = args.task
         if not args.save:
-            tp.checkpoint_every = 0
+            ep.checkpoint_every = 0
         for mpv in all_config_variants(mp):
             for tpv in all_config_variants(tp):
-                namer.set_config_index(config_index)
-                run_all(args, dp, tpv, mpv, namer)
-                config_index += 1
+                for epv in all_config_variants(ep):
+                    namer.set_config_index(config_index)
+                    run_all(args, dp, tpv, epv, mpv, namer)
+                    config_index += 1
 
 
 # eg ['--config','debug','--return-things']

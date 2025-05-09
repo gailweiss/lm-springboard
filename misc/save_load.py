@@ -9,6 +9,7 @@ from train.train_params import make_tp
 from model.model_params import make_mp
 from model.tokenizer import load_stored_tokenizer_if_exists
 from data.data_params import make_dp
+from eval.eval_params import make_ep
 import glob
 from misc.util import printer_print as print
 from dataclasses import asdict
@@ -34,11 +35,12 @@ final_chkpt = "final"
 
 
 def save_model(folder_name, pl_trainer, my_trainer, model_params, data_params,
-               train_params, just_stats=False):
+               train_params, eval_params, just_stats=False):
     prepare_directory(folder_name)
     for p, n in [(model_params, "model_params"),
                  (data_params, "data_params"),
-                 (train_params, "train_params")]:
+                 (train_params, "train_params"),
+                 (eval_params, "eval_params")]:
         with open(path.join(folder_name, f"{n}.json"), "w") as f:
             json.dump(vars(p), f)
         # json will turn tuples into lists, which is annoying. but i expect
@@ -120,6 +122,10 @@ def load_model_info(folder_name, with_train_stats=False, verbose=True,
     with open(path.join(folder_name, "train_params.json"), "r") as f:
         res["params"]["train_params"] = make_tp(verbose=verbose,
                                                 **json.load(f))
+    with open(path.join(folder_name, "eval_params.json"), "r") as f:
+        res["params"]["eval_params"] = make_ep(verbose=verbose,
+                                                **json.load(f))
+
 
     for pn, pd in res["params"].items():
         if None is pd:

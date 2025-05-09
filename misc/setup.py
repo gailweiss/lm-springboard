@@ -30,6 +30,7 @@ def setup_model_and_data(data_params, model_params, train_params, verbose=True,
     load_res = {}
     if loading:
         if model_params.from_saved:
+            identifier = model_params.from_saved
             p = get_full_path(identifier, checkpoint=checkpoint)
             err_msg = f"didn't find path for identifier {identifier}"
             assert None is not p, err_msg

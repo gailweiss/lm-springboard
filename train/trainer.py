@@ -7,12 +7,12 @@ from eval.hellaswag import hellaswag_eval
 
 
 class Trainer(pl.LightningModule):
-    def __init__(self, model, train_params, start_time=None,
-                 samples_at_validation=True,
-                 train_dataloader_nbatches=None):
+    def __init__(self, model, train_params, eval_params, start_time=None,
+                 samples_at_validation=True, train_dataloader_nbatches=None):
         super().__init__()
         self.model = model
         self.train_params = train_params
+        self.eval_params = eval_params
         self.curr_train_stats_by_type = {"loss": {}, "acc": {}}
         self.curr_val_stats_by_type = {"loss": {}, "acc": {}}
         self.start_time = start_time  # should be obtained with process_time()
@@ -48,30 +48,30 @@ class Trainer(pl.LightningModule):
             # after just having saved by other means
         fn = f"{self.saving_folder}/{self.n_train_samples}"
         self.saving_function(fn, self.trainer, self, self.model.model_params,
-                             self.dp, self.train_params)
+                             self.dp, self.train_params, self.eval_params)
         self.last_checkpoint_nsamples = self.n_train_samples
 
     def maybe_save_checkpoint(self, after_val=False, after_train_epoch=False):
-        if self.train_params.checkpoint_every == 0 or\
-           self.train_params.checkpoint_every < -1:
+        if self.eval_params.checkpoint_every == 0 or\
+           self.eval_params.checkpoint_every < -1:
             return  # never checkpoints
 
-        if self.train_params.checkpoint_every > 0:
+        if self.eval_params.checkpoint_every > 0:
             checkpoint_i = (self.n_train_samples //
-                            self.train_params.checkpoint_every)
+                            self.eval_params.checkpoint_every)
             if checkpoint_i > self.last_checkpoint_i:
                 self.save_checkpoint()
                 self.last_checkpoint_i = checkpoint_i
                 return
 
-        if after_val and self.train_params.checkpoint_every == -1:
+        if after_val and self.eval_params.checkpoint_every == -1:
             self.save_checkpoint()
             return
         if after_train_epoch:
             self.save_checkpoint()
 
     def log_stat(self, name, val):
-        if not self.train_params.no_wandb:
+        if not self.eval_params.no_wandb:
             wandb.log({name: val})
         if name not in self.logged_stats_dict:
             self.logged_stats_dict[name] = []
@@ -122,8 +122,8 @@ class Trainer(pl.LightningModule):
         if self.samples_at_validation:
             print("=== sampling: ===")
             sample = self.model.sample(
-                        max_seq_len=self.train_params.max_sample_tokens,
-                        temperature=self.train_params.sample_temperature)
+                        max_seq_len=self.eval_params.max_sample_tokens,
+                        temperature=self.eval_params.sample_temperature)
             # linux doesnt always like printing the samples if they have funny
             # characters
             try:
@@ -136,7 +136,7 @@ class Trainer(pl.LightningModule):
         self.maybe_save_checkpoint(after_val=True)
 
     def log_other_evals(self):
-        if self.train_params.track_hellaswag:
+        if self.eval_params.track_hellaswag:
             subset = "val"
             self.log_stat(f"eval/hellaswag-{subset}",
                           hellaswag_eval(self.model, subset=subset))
@@ -171,10 +171,10 @@ class Trainer(pl.LightningModule):
         self.log_time()
 
     def slow_log_time(self):
-        return (self.n_opt_steps % self.train_params.slower_log_freq) == 0
+        return (self.n_opt_steps % self.eval_params.slower_log_freq) == 0
 
     def extra_log_time(self):
-        return self.train_params.extra_tracking and self.slow_log_time()
+        return self.eval_params.extra_tracking and self.slow_log_time()
 
     def maybe_log_hyperparams_and_time(self):
         if self.slow_log_time():
