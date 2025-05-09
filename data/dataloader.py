@@ -36,8 +36,8 @@ def get_data(data_params):
         samples = ptbloader()
     elif data_params.dataset_name.startswith("c4-"):  # eg c4-en 
         samples = c4loader(data_params)
-    elif data_params.dataset_name == "fineweb-ml":
-        samples, lang_counters = finewebloader(data_params)
+    elif data_params.dataset_name in ["fineweb-ml", "wiki40b"]:
+        samples, lang_counters = multiloader(data_params)
     elif data_params.task_type == "synthetic":
         samples = syntheticdatasets.get(data_params.dataset_name)
     elif None is not get_local_datafolder(data_params.dataset_name):
@@ -137,17 +137,25 @@ def verysimplesamplesreader(path, data_params):
     return all_samples
 
 
-class MultiFineWeb:
-    def __init__(self, langs):
+class MultiLingualLoader:
+    def __init__(self, base, langs):
+        assert base in ["fineweb-ml", "wiki40b"]
         self.datasets = {}
         self.langs = langs
         for lang in self.langs:
-            if not lang == "en":
+            if base == "wiki40b":
                 self.datasets[lang] = datasets.load_dataset(
-                    "HuggingFaceFW/fineweb-2", name=lang, streaming=True)
+                    base, name=lang, streaming=True)
+            elif base == "fineweb-ml":
+                if not lang == "en":
+                    self.datasets[lang] = datasets.load_dataset(
+                        "HuggingFaceFW/fineweb-2", name=lang, streaming=True)
+                else:
+                    self.datasets[lang] = datasets.load_dataset(
+                        "HuggingFaceFW/fineweb", name="CC-MAIN-2024-18",
+                        streaming=True)
             else:
-                self.datasets[lang] = datasets.load_dataset(
-                    "HuggingFaceFW/fineweb", name="CC-MAIN-2024-18", streaming=True)
+                raise NotImplementedError
         self.iterators = {lang:{"train": iter(self.datasets[lang]["train"])}
                           for lang in self.datasets}
         for lang in self.langs:
@@ -158,7 +166,7 @@ class MultiFineWeb:
         self.nl = len(self.langs)
         self.ran_out = set()
 
-    def get_next_sample_full(self, split, attempt=0):
+    def get_next_sample_full(self, split, fallback="train", attempt=0):
         # can consider implementing different proportions for data later,
         # if see dont have enough
         if attempt > self.nl:
@@ -167,11 +175,14 @@ class MultiFineWeb:
         lang = self.langs[self.c % self.nl]
         self.c += 1
         it_d = self.iterators[lang]
-        it = it_d.get(split, it_d["train"])  # if no test available, continue
-        # iterator from train, getting samples that havent been put in own
-        # train yet
+        it = it_d.get(split, it_d[fallback])  # if no val/test available,
+        # continue iterator from received train, getting samples that *havent
+        # been put in own train*
         try:
-            return next(it)
+            res = next(it)
+            if "language" not in res:
+                res["language"] = lang
+            return res
         except StopIteration as e:
             if (lang, split) not in self.ran_out:
                 self.ran_out.update([(lang, split)])
@@ -179,21 +190,21 @@ class MultiFineWeb:
                       "in split", split)
             return self.get_next_sample_full(split, attempt=attempt + 1)
 
-    def get_next_sample_small(self, split):
-        s = self.get_next_sample_full(split)
+    def get_next_sample_small(self, split, fallback="train"):
+        s = self.get_next_sample_full(split, fallback=fallback)
         return (s["text"], f"Lang[{s['language']}]")
-        # "en" samples can also give s["token_count"], the number of tokens
-        # they would use in gpt2. but this is not present in the fineweb2
-        # samples, so avoiding here
+        # fineweb "en" samples can also give s["token_count"], the number of
+        # tokens they would use in gpt2. but this is not present in the
+        # fineweb2 samples, so avoiding here
 
 
-def finewebloader(data_params):
+def multiloader(data_params):
     # interesting note: fineweb samples also have the token count for how many
     # tokens they would use in the gpt2 tokenizer. could be useful if trying to
     # really balance data down the line, for now am ignoring
     langs = data_params.langs
-    print("\n\ngetting fineweb langs:", langs)
-    d = MultiFineWeb(langs)
+    print(f"\n\ngetting {data_params.dataset_name} langs: {langs}")
+    d = MultiLingualLoader(data_params.dataset_name, langs)
     assert None is not data_params.debug_crop
     total_load = int(data_params.debug_crop)
     val_frac = data_params.val_pct / 100
@@ -206,12 +217,10 @@ def finewebloader(data_params):
     print("working with data_params:", data_params)
     print("so want to get train/val/test amounts:", fullnumbers)
     res = {}
-    print("loading fineweb samples - train, val, test")
+    print(f"loading {data_params.dataset_name} samples - train, val, test")
     res["train"] = [d.get_next_sample_small("train") for _ in
                     tqdm(range(n_train_fullsamples))]
-    # no val sets in fineweb, and val effectively used for training, so get
-    # data from there
-    res["validation"] = [d.get_next_sample_small("train") for _ in
+    res["validation"] = [d.get_next_sample_small("validation") for _ in
                          tqdm(range(n_val_fullsamples))]
     res["test"] = [d.get_next_sample_small("test") for _ in
                    tqdm(range(n_test_fullsamples))]
@@ -279,8 +288,12 @@ def assure_validation(data_params, multilingual_samples):
                             counters["validation"][lang])
         print(f"forcing validation samples in {lang}, taking {n_val_missing}",
               "samples from train to val")
+        n_val_missing = max(1, n_val_missing)
+        # if here, definitely want to take at least one. really ,this is a
+        # corner case when making small datasets to test the code
         val_samples += ts_lang[-n_val_missing:]
-        multilingual_samples["train"] = ts_not_lang + ts_lang[:-n_val_missing]
+        multilingual_samples["train"] = ts_not_lang + \
+                                        ts_lang[:-n_val_missing]
 
     train_pct = 100 - data_params.val_pct - data_params.test_pct
     goal_val_v_train = data_params.val_pct / train_pct

@@ -71,6 +71,8 @@ class LMDataModule(pl.LightningDataModule):
             self.data_params.total_samples = \
                 sum([len(ds) for ds in [self.train_samples, self.val_samples,
                                         self.test_samples]])
+        self.tokenizer_size = self.tokenizer.vocab_size
+        # a helpful curio to stick in the notes
 
     def set_max_seq_len(self):
         self.max_seq_len = self.model_params.max_seq_len
@@ -139,7 +141,7 @@ class LMDataModule(pl.LightningDataModule):
         self.from_path = path
         self.tokenizer.save(path)
         base_attr_names = ["train_n", "test_n", "val_n",
-                           "lang_fullsample_counts"]
+                           "lang_fullsample_counts", "tokenizer_size"]
         notes = {n: getattr(self, n) for n in base_attr_names}
         with open(path_join(path, f"dataloader_notes.json"), "w") as f:
             json.dump(notes, f)
