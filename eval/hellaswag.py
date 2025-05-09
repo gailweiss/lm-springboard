@@ -1,6 +1,7 @@
 import torch
 import os
 import json
+from misc.util import timed
 
 try:
     with open("paths/evals-paths.txt", "r") as f:
@@ -44,6 +45,7 @@ def get_hellaswag_subset(lm, subset="val", path=None):
     return full_seqs, y, n_opts
     
 
+@timed
 def hellaswag_eval(lm, subset="val", path=None):
     full_seqs_or_dl, y, n_opts = get_hellaswag_subset(lm, subset=subset,
                                                       path=path)
