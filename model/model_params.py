@@ -79,10 +79,11 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #           different amount.
 #       "bert-base-uncased":
 #           Will load the "bert-base-uncased" tokenizer from Huggingface, and
-#           crop it to only the tokens which appear in the dataset (so the
-#           token ids may be different)
-#       "gpt2":
-#           As with "bert-base-uncased", but with the gpt2 tokenizer.
+#           possibly crop it to only the tokens which appear in the dataset
+#           (in which case the token ids may be different)
+#       "gpt2" / "xlm-roberta-large":
+#           As with "bert-base-uncased", but with the gpt2/xlm-roberta-large
+#           tokenizers.
 # custom_tokenizer_ntokens:
 #   Used when creating a custom tokenizer, as a guide for the desired tokenizer
 #   vocabulary size. Does not force an exact size however.

@@ -14,7 +14,7 @@ class LM(nn.Module):
         self.model_params = model_params
         self.train_params = train_params
         self.decoder = model
-        self.n_tokens = tokenizer.vocab_size()
+        self.n_tokens = tokenizer.vocab_size
         if True in [n in self.model_params.from_os_pretrained for 
                     n in ["gpt2", "pythia"]]:
             self.embed = None
@@ -38,7 +38,7 @@ class LM(nn.Module):
         self.celoss = nn.CrossEntropyLoss(ignore_index=self.ignore_index)
         self.ordered_tokens = \
             list(self.tokenizer.convert_ids_to_nice_string([i]) for i in
-                 range(self.tokenizer.vocab_size()))
+                 range(self.tokenizer.vocab_size))
         if self.model_params.tie_embed_deembed:
             msg = "Embedding layers must exist to tie weights"
             assert None not in [self.embed, self.de_embedder], msg

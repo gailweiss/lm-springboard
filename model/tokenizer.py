@@ -1,6 +1,6 @@
 from data.syntheticdata import SyntheticSamplesIterator
 from transformers import BertTokenizer, GPT2Tokenizer, AutoTokenizer, \
-                         GPTNeoXTokenizerFast
+                         GPTNeoXTokenizerFast, XLMRobertaTokenizerFast
 from misc.util import timed
 import tokenizers
 from transformers import PreTrainedTokenizerFast
@@ -111,14 +111,10 @@ class CharTokenizer:
 
 class BertTokenizerLike:
     def __init__(self, data=None, custom_vocab_size=30,
-                 from_path=None, from_gpt2tokenizer=None,
+                 from_path=None, from_autotokenizer=None,
                  from_gptneoxtokenizer=None, verbose_init=False):
-        if from_gpt2tokenizer:
-            self.internal = from_gpt2tokenizer
-            self._pad_token_type_id = self.internal._pad_token_type_id
-            self.unk_token_id = self.internal.unk_token_id
-        elif from_gptneoxtokenizer:
-            self.internal = from_gptneoxtokenizer
+        if from_autotokenizer:
+            self.internal = from_autotokenizer
             self._pad_token_type_id = self.internal._pad_token_type_id
             self.unk_token_id = self.internal.unk_token_id
         else:
@@ -144,6 +140,12 @@ class BertTokenizerLike:
                isinstance(self.internal, GPTNeoXTokenizerFast):
                 res = [self.internal.bos_token_id] + res + \
                       [self.internal.eos_token_id]
+            else:
+                assert isinstance(self.internal, XLMRobertaTokenizerFast)
+                # make sure doing expected things, no surprises, know for
+                # sure whether to add eos and bos or not.
+                # XLMRobertaTokenizerFast adds eos bos, gpt2s do not.
+                # BertTokenizer does too but it wont be an internal here
             return res
         res = single(samples) if isinstance(samples, str) else \
             [single(s) for s in samples]
@@ -153,6 +155,7 @@ class BertTokenizerLike:
     def get_vocab(self):
         return self.internal.get_vocab()
 
+    @property
     def vocab_size(self):
         return len(self.get_vocab())
 
@@ -176,9 +179,9 @@ def getBertLikeTokenizer(name, data=None, custom_vocab_size=30,
         return BertTokenizerLike(data=data,
                                  custom_vocab_size=custom_vocab_size,
                                  verbose_init=verbose_init)
-    if "gpt2" in name:
-        gpt2tok = GPT2Tokenizer.from_pretrained(name)
-        return BertTokenizerLike(from_gpt2tokenizer=gpt2tok,
+    if True in [n in name for n in ["gpt2", "xlm-roberta"]]:
+        tok = AutoTokenizer.from_pretrained(name)
+        return BertTokenizerLike(from_autotokenizer=tok,
                                  verbose_init=verbose_init)
     if "pythia" in name:
         stepstr = name.split("/")[-1]
@@ -186,7 +189,7 @@ def getBertLikeTokenizer(name, data=None, custom_vocab_size=30,
         # pythia model name format: 
         # "EleutherAI/pythia-{size_str}" + optional "-deduped" + "/{stepstr}"
         pythiatok = AutoTokenizer.from_pretrained(loadstr, revision=stepstr)
-        return BertTokenizerLike(from_gptneoxtokenizer=pythiatok,
+        return BertTokenizerLike(from_autotokenizer=pythiatok,
                                  verbose_init=verbose_init)
     if "bert" in name:
         res = BertTokenizer.from_pretrained(name)
@@ -265,7 +268,7 @@ class MyTokenizer:
     @timed
     def prepare_crop(self, data):
         # data: list of inputs, eg ["hi","i am a sample"]
-        self.v_orig = self.vocab_size()
+        self.v_orig = self.vocab_size
 
         actual_used_ids = set()
         jump = 50
@@ -294,8 +297,8 @@ class MyTokenizer:
         self.masking_cropped = True
 
         if self.verbose_init:
-            print("vocab size after cropping tokenizer:", self.vocab_size())
-            print("num tokens cropped:", self.v_orig - self.vocab_size())
+            print("vocab size after cropping tokenizer:", self.vocab_size)
+            print("num tokens cropped:", self.v_orig - self.vocab_size)
 
     def get_vocab(self):
         r = self.tokenizer.get_vocab()  # gives {tok:id} dict
@@ -359,6 +362,7 @@ class MyTokenizer:
         else:
             return [finalise_single(line) for line in internal_res]
 
+    @property
     def vocab_size(self):
         d = self.get_vocab()
         lst = list(d.values())
