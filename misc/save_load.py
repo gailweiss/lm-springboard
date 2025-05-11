@@ -215,7 +215,8 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
     # passed in parameter lm, so will get it explicitly back from the trainer
     model_trainer = Trainer.load_from_checkpoint(
         path.join(folder_name, "model.model"), model=res["lm"],
-        train_params=res["params"]["train_params"])
+        train_params=res["params"]["train_params"],
+        eval_params=res["params"]["eval_params"])
 
     res["lm"] = model_trainer.model  # in case it makes a copy or something
 
