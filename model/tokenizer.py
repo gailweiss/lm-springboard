@@ -1,6 +1,7 @@
 from data.syntheticdata import SyntheticSamplesIterator
 from transformers import BertTokenizer, GPT2Tokenizer, AutoTokenizer, \
-                         GPTNeoXTokenizerFast, XLMRobertaTokenizerFast
+                         GPTNeoXTokenizerFast, XLMRobertaTokenizerFast, \
+                         GPT2TokenizerFast
 from misc.util import timed
 import tokenizers
 from transformers import PreTrainedTokenizerFast
@@ -137,11 +138,12 @@ class BertTokenizerLike:
             else:  # PreTrainedTokenizerFast
                 res = self.internal(s)['input_ids']
             if isinstance(self.internal, GPT2Tokenizer) or \
-               isinstance(self.internal, GPTNeoXTokenizerFast):
+               isinstance(self.internal, GPTNeoXTokenizerFast) or \
+               isinstance(self.internal, GPT2TokenizerFast):
                 res = [self.internal.bos_token_id] + res + \
                       [self.internal.eos_token_id]
             else:
-                assert isinstance(self.internal, XLMRobertaTokenizerFast)
+                assert isinstance(self.internal, XLMRobertaTokenizerFast), self.internal
                 # make sure doing expected things, no surprises, know for
                 # sure whether to add eos and bos or not.
                 # XLMRobertaTokenizerFast adds eos bos, gpt2s do not.
