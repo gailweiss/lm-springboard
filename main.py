@@ -254,7 +254,7 @@ def run_config(args, dp, tp, ep, mp, namer):
     print("going to train from config: [", args.config,
           "], using the following parameters:")
     print_nicely_nested(full_params)
-    lm, dataset = setup_model_and_data(dp, mp, tp,
+    lm, dataset = setup_model_and_data(dp, mp, tp, ep,
                                        keep_datamodule=args.keep_datamodule)
     dp = dataset.data_params
     # accurately reflect the data params of the dataset that was selected

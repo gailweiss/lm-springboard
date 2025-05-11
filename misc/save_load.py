@@ -170,7 +170,7 @@ def load_model(folder_name, full=False, verbose=True, with_data=False,
 
     res = load_model_info(folder_name, verbose=verbose)
 
-    res["params"]["train_params"].no_wandb = True  # no wandb in loaded models
+    res["params"]["eval_params"].no_wandb = True  # no wandb in loaded models
     # - or it will try (unsuccessfully) to send validation losses to wandb when
     # doing a validation run
 

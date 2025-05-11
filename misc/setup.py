@@ -21,8 +21,8 @@ def sync_model_params(requested_model_params, loaded_model_params):
         setattr(requested_model_params, a, getattr(loaded_model_params, a))
 
 
-def setup_model_and_data(data_params, model_params, train_params, verbose=True,
-                         skip_data=False, keep_datamodule=False):
+def setup_model_and_data(data_params, model_params, train_params, eval_params,
+                         verbose=True, skip_data=False, keep_datamodule=False):
 
     dataset = None
 
