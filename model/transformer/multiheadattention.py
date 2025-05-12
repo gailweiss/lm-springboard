@@ -11,6 +11,7 @@ from torch.nn.init import constant_, xavier_normal_, xavier_uniform_
 from torch.nn import functional as F
 from model.transformer.torch_f_multi_head_attention_forward import \
         multi_head_attention_forward
+import math
 
 
 class MultiheadAttention(nn.Module):
@@ -81,8 +82,23 @@ class MultiheadAttention(nn.Module):
 
     def _reset_parameters(self):
         if self.model_params.individual_head_params:
+            # xavier initialisation uses uniform distribution in
+            # range determined by initialised matrix size.
+            # turns out that the transformer is relatively sensitive to this
+            # scale at initialisation. presumably not so much that using just
+            # in_proj_weight vs the tuple
+            # (q_proj_weight, k_proj_weight, v_proj_weight) matters,
+            # but clearly (following experiments) enough that separating the
+            # heads into individual parameters prevents successful learning.
+            # hence, need to use appropriate gain at initialisation
+            in_proj_weight_bottom_would_be = math.sqrt(4 * self.embed_dim)
+            def get_gain(linear):
+                bottom_ended_up = math.sqrt(sum(linear.weight.shape))
+                return bottom_ended_up / in_proj_weight_bottom_would_be
+
             for Ls in [self.Qs, self.Ks, self.Vs]:
-                [xavier_uniform_(linear.weight) for linear in Ls]
+                [xavier_uniform_(linear.weight, gain=get_gain(linear)) for
+                 linear in Ls]
         else:
             if self._qkv_same_embed_dim:
                 xavier_uniform_(self.in_proj_weight)
