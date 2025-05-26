@@ -28,6 +28,8 @@ def make_mp(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
     if d.get("layer_architecture", defaults.layer_architecture) in \
         ["torch-lstm", "torch-gru"]:
         assert d["pos_encoding"] == "none", (d["pos_encoding"], d)
+    if d.get("individual_head_params", False):
+        assert d["layer_architecture"] == "custom-transformer"
     return apply_dataclass(ModelParams, d, forgiving=forgiving,
                            convert_lists_to_tuples=convert_lists_to_tuples,
                            verbose=verbose, takes_extras=takes_extras)
