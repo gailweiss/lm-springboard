@@ -1,6 +1,7 @@
 import random
 import string
 from copy import deepcopy
+from data.support import RawSample
 
 
 class SyntheticSamplesIterator:
@@ -15,6 +16,8 @@ class SyntheticSamplesIterator:
         random.seed(i)
         res = self.generator()
         random.setstate(s)
+        if isinstance(res, str):
+            res = RawSample(res)
         return res
 
     def __len__(self):

@@ -4,6 +4,7 @@ from misc.util import glob_nosquares
 from misc.util import printer_print as print
 from tqdm import tqdm
 from collections import Counter
+from data.support import RawSample
 
 
 try:
@@ -60,6 +61,16 @@ def get_data(data_params):
             samples = apply_crop(samples)
         else:
             samples = {n: apply_crop(samples[n]) for n in samples}
+
+    # if samples have not yet been placed in RawSample format, do so now
+    # note: SyntheticSamplesIterator makes sure to generate RawSamples
+    if isinstance(samples, list) and isinstance(samples[0], str):
+        samples = [RawSample(s) for s in samples]
+    elif isinstance(samples, dict):
+        for dn, dl in samples.items():
+            assert isinstance(dl, list), dn
+            if isinstance(dl[0], str):
+                samples[dn] = [RawSample(s) for s in dl]
     return samples, lang_counters
 
 
@@ -240,8 +251,8 @@ def multiloader(data_params):
     print_sample_counts("after")
 
     for dataset_name in res:
-        res[dataset_name] = [s[0] for s in res[dataset_name]]
-        # remove language notes
+        res[dataset_name] = [RawSample(s[0], lang=s[1]) for
+                             s in res[dataset_name]]
     return res, final_lang_counters
 
 

@@ -10,6 +10,8 @@ import numpy as np
 from misc.util import prepare_directory
 import json
 from misc.util import printer_print as print
+from pathlib import Path
+from data.support import TokenizedSample
 
 
 try:
@@ -119,16 +121,17 @@ class LMDataModule(pl.LightningDataModule):
                 indices = torch.where(
                     indices == -1, self.tokenizer.pad_token_id, indices)
             setattr(self, sn, ForTorchDataSet(lengths, indices))
-
         self.finalise_data()
 
     def prep_for_torch_datasets(self):
         def arranged(samples):
             lengths = np.array([len(s) for s in samples])
             indices = np.zeros((len(samples), lengths.max()), dtype=int)
-            for i, (n, inds) in enumerate(zip(lengths, samples)):
-                indices[i, :n] = inds
+            ls = zip(lengths, samples)
+            for i, (n, s) in enumerate(ls):
+                indices[i, :n] = s.indices
                 indices[i, n:] = self.tokenizer.pad_token_id
+
             return lengths, indices
 
         for sn in ["train_samples", "test_samples", "val_samples"]:
@@ -171,7 +174,7 @@ class LMDataModule(pl.LightningDataModule):
                              (train_n, val_n, test_n),
                              force_no_split_shuffle=True)
 
-    def compute_n_full_samples_per_set(self, n_samples, sizes):
+    def decide_n_full_samples_per_set(self, n_samples, sizes):
         if None is not sizes:
             train_n, val_n, test_n = sizes
         else:
@@ -184,11 +187,11 @@ class LMDataModule(pl.LightningDataModule):
         assert cond, f"lengths:{test_n},{val_n},{train_n}"
         return train_n, val_n, test_n
 
-    def chunk_long_samples(self, tokenized_data):
+    def chunk_long_samples(self, tokenized_samples):
         # breaks long samples into samples of length up to
         # self.max_seq_len, so len(res) >= len(tokenized_data)
         res = []
-        for s in tokenized_data:
+        for s in tokenized_samples:
             if (self.data_params.task_type == "synthetic" and
                not self.data_params.breaking_synthetic_samples_ok):
                 msg = f"got synthetic sample longer than allowed: {len(s)}" +\
@@ -200,12 +203,12 @@ class LMDataModule(pl.LightningDataModule):
                     return lst[i:i + self.max_seq_len + 1]
                     # +1 to have max_len + 1 tokens, as the first max_len are
                     # input and the last max_len are prediction
-                schunk = get_chunk(s)
+                schunk = get_chunk(s.indices)
 
                 # need at least 1 token and its next token
                 # to do LM training
                 if len(schunk) > 1:
-                    res.append(schunk)
+                    res.append(TokenizedSample(schunk))
         return res
 
     def print_data_desc(self, overall_list=None):
@@ -229,8 +232,9 @@ class LMDataModule(pl.LightningDataModule):
         # force_no_split_shuffle: no shuffle overrides a shuffle before the
         # dataset split, in case i ever want to add one
         n = len(samples)
-        data = self.tokenizer(samples)
-        train_n, val_n, test_n = self.compute_n_full_samples_per_set(
+        sample_seqs = [s.seq for s in samples]
+        data = [TokenizedSample(s) for s in self.tokenizer(sample_seqs)]
+        train_n, val_n, test_n = self.decide_n_full_samples_per_set(
                                         len(samples), sizes)
 
         # split without shuffling always for now, and beware of
@@ -278,7 +282,8 @@ class LMDataModule(pl.LightningDataModule):
             datasets = [getattr(self, f"{from_ds}_samples")]
         for ds in datasets:
             if i < len(ds):
-                n, indices = ds[i]  # length, indices
+                # ds is a ForTorchDataSet, getitem returns: length, indices
+                n, indices = ds[i]
                 return n, indices[:n]
             i -= len(ds)
         n = sum([len(ds) for ds in datasets])
