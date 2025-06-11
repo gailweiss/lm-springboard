@@ -38,15 +38,15 @@ def make_dp(forgiving=False, takes_extras=False, redo_synth_eval=False,
                           verbose=verbose, takes_extras=takes_extras)
 
     if redo_synth_eval or d.get("task_type", "?") == "?":
-        res.task_type = synthetic_task_flag(res)
+        res.task_type = task_type_flag(res)
     return res
     # ready for fixes over time
 
 
-def synthetic_task_flag(data_params):
+def task_type_flag(data_params):
     if syntheticdatasets.has_dataset(data_params.dataset_name):
         return "synthetic"
-    if "fineweb" in data_params.dataset_name:
+    if True in [n in data_params.dataset_name for n in ["fineweb", "wiki40b"]]:
         # removing "and len(data_params.langs) > 1" because it's still
         # going to go through the whole multilingual process here, just the
         # number ends up being 1 (and noting that it's gone through this
