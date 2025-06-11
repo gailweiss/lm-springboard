@@ -13,6 +13,10 @@ except Exception as e:
     path_opts = []
 
 
+# assumes hellaswag taken from repository: 
+# https://github.com/rowanz/hellaswag
+
+
 def get_hellaswag_subset(lm, subset="val", path=None):
     if None is path:
         for p in path_opts:
