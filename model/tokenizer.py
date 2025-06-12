@@ -113,7 +113,7 @@ class CharTokenizer:
 class BertTokenizerLike:
     def __init__(self, data=None, custom_vocab_size=30,
                  from_path=None, from_autotokenizer=None,
-                 from_gptneoxtokenizer=None, verbose_init=False):
+                 verbose_init=False):
         if from_autotokenizer:
             self.internal = from_autotokenizer
             self._pad_token_type_id = self.internal._pad_token_type_id
