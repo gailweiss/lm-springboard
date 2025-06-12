@@ -70,7 +70,7 @@ class CharTokenizer:
             isinstance(data, SyntheticSamplesIterator)
         assert expected_format
         for s in data:
-            tokens.update(list(s))
+            tokens.update(list(s.seq))
         tokens.update(self.special_tokens)
         return sorted(list(tokens))
 
