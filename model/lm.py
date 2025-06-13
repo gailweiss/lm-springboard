@@ -173,9 +173,9 @@ class LM(nn.Module):
             total_preds += stats["num_preds"]
             if per_token:
                 ptr = losses if before_exp else torch.exp(losses)
-                if None is not stats["mask"]:
-                    ptr = torch.where(stats["mask"].bool(), dummy_res, ptr)
-                    # false (0) - in sequence, true (1) - out of sequence
+                ptr = torch.where(b["target_mask"].bool(), dummy_res, ptr)
+                # target_mask: false (0) - real target,
+                # true (1) - ignore (out of sequence, or not to be trained on)
                 per_token_res.append(ptr)
                 # ptr shape: batch_size x max_seq_len
         mean_l = sum(mean_ls) / len(mean_ls)
@@ -191,14 +191,8 @@ class LM(nn.Module):
 
     def get_batch_xyz(self, batch, loss_requests=None):
         loss_requests = {} if None is loss_requests else loss_requests
-        indices = batch["x_indices"]
-        # padded indices have already been set to self.tokenizer.pad_token_id
-        x = indices[:, :-1]
-        y = indices[:, 1:]  # -> y not contiguous
-        # -> y.view(-1) won't work, need reshape instead
-        y = y.to(dtype=torch.long)  # cross entropy loss expects target to have
-        # type 'long' and will crash without explanation otherwise, so lets
-        # just be safe
+        x, y = batch["x"], batch["y"]
+        y = torch.where(batch["target_mask"].bool(), self.ignore_index, y)
         z = self(x)["logits"]
         res = {"x": x, "y": y, "z": z}
         return res
@@ -211,10 +205,11 @@ class LM(nn.Module):
         main_loss = self.celoss(z, y)
         losses = {"main": main_loss}
         if accs_too:
-            not_y_mask = y != self.ignore_index  # 1 if in sequence, 0 if out
-            z_match = z.argmax(dim=-1) == y
-            correct = torch.logical_and(z_match, not_y_mask).sum()
-            count = not_y_mask.sum()
+            active_target = torch.logical_not(batch["target_mask"]).reshape(-1)
+            # 1 if target to train, 0 if not
+            z_match = z.argmax(dim=-1) == y  # shape: batch size * seq len
+            correct = torch.logical_and(z_match, active_target).sum()
+            count = active_target.sum()
             accs = {"main": (correct / count).item()}
         else:
             accs = None
@@ -233,25 +228,18 @@ class LM(nn.Module):
         losses = losses.detach()
         res = losses if before_exp else torch.exp(losses)  # perplexity: e^loss
 
-        mask = batch["mask"]  # 0 if on (in sequence), 1 if off (past sequence)
-        if None is not mask:
-            mask = mask[:, 1:]  # output positions only
-            mm = mask.reshape(-1)
-            num_masked = mask.sum().item()
-            num_unmasked = mm.shape[0] - num_masked
-            # total actual length of input/output sequences
-            res = torch.where(mask.bool(), 0, res)
-            # 0 as dummy value useful for computing mean and max, below
-        else:
-            num_unmasked = losses.view(-1).shape[0]
+        target_mask = batch["target_mask"]
+        # 0 if on (do eval), 1 if off (ignore)
+        num_masked = target_mask.sum().item()
+        num_unmasked = target_mask.reshape(-1).shape[0] - num_masked
+        # total actual length of input/output sequences
+        res = torch.where(target_mask.bool(), 0, res)
+        # 0 as dummy value useful for computing mean and max, below
         mean = res.sum() / num_unmasked
         max_p = res.max()  # all losses are >=0, so dummy value (0, above) fine
-        if None is not mask:
-            min_p = torch.where(mask.bool(), torch.inf, res).min()
-        else:
-            min_p = res.min()
+        min_p = torch.where(target_mask.bool(), torch.inf, res).min()
         stats = {"mean": mean.item(), "max": max_p.item(), "min": min_p.item(),
-                 "num_preds": num_unmasked, "mask": mask}
+                 "num_preds": num_unmasked}
         return res, stats
         # res contains 0 where masked, as useful dummy value for means
 

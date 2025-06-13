@@ -26,18 +26,24 @@ except Exception as e:
 
 
 class ForTorchDataSet:
-    def __init__(self, lengths, indices):
+    def __init__(self, lengths, indices, target_masks):
         self.lengths = lengths
         self.indices = torch.as_tensor(indices)
+        self.target_masks = torch.as_tensor(target_masks)
+        # 1 if off (dont train to predict), 0 if on (do train to predict)
 
     def total_tokens(self):
         return sum(self.lengths).item()
 
     def as_indices_list(self):
-        return [s.tolist()[:l] for s, l in zip(self.indices, self.lengths)]
+        return [s.tolist()[:n] for s, n in zip(self.indices, self.lengths)]
+
+    def as_target_masks_list(self):
+        return [s.tolist()[:n] for s, n in
+                zip(self.target_masks, self.lengths)]
 
     def __getitem__(self, i):
-        return self.lengths[i], self.indices[i]
+        return self.lengths[i], self.indices[i], self.target_masks[i]
 
     def __len__(self):
         return len(self.lengths)
@@ -112,6 +118,7 @@ class LMDataModule(pl.LightningDataModule):
         for sn in ["train_samples", "test_samples", "val_samples"]:
             indices = np.load(path_join(path, f"{sn}-indices.npy"))
             lengths = np.load(path_join(path, f"{sn}-lengths.npy"))
+            target_masks = np.load(path_join(path, f"{sn}-target_masks.npy"))
 
             # TEMPORARY until stop using old dataloaders which didnt save
             # pads correctly (anything older than 2025.01.14), and had
@@ -120,23 +127,30 @@ class LMDataModule(pl.LightningDataModule):
                 indices = torch.as_tensor(indices)
                 indices = torch.where(
                     indices == -1, self.tokenizer.pad_token_id, indices)
-            setattr(self, sn, ForTorchDataSet(lengths, indices))
+            setattr(self, sn, ForTorchDataSet(lengths, indices, target_masks))
         self.finalise_data()
 
     def prep_for_torch_datasets(self):
         def arranged(samples):
             lengths = np.array([len(s) for s in samples])
-            indices = np.zeros((len(samples), lengths.max()), dtype=int)
+            seqlen = lengths.max()
+            indices = np.zeros((len(samples), seqlen), dtype=int) +\
+                      self.tokenizer.pad_token_id
+            nomask = np.zeros(seqlen)
+            target_masks = np.ones((len(samples), seqlen), dtype=int)
             ls = zip(lengths, samples)
             for i, (n, s) in enumerate(ls):
-                indices[i, :n] = s.indices
-                indices[i, n:] = self.tokenizer.pad_token_id
+                indices[i, :n] = s.indices[:n]
+                target_masks[i, :n] = s.target_mask[:n] if\
+                                      None is not s.target_mask else\
+                                      nomask[:n]
 
-            return lengths, indices
+
+            return lengths, indices, target_masks
 
         for sn in ["train_samples", "test_samples", "val_samples"]:
-            lengths, indices = arranged(getattr(self, sn))
-            setattr(self, sn, ForTorchDataSet(lengths, indices))
+            lengths, indices, target_masks = arranged(getattr(self, sn))
+            setattr(self, sn, ForTorchDataSet(lengths, indices, target_masks))
 
     def save_to_folder(self, path):
         prepare_directory(path)
@@ -155,7 +169,7 @@ class LMDataModule(pl.LightningDataModule):
 
         for sn in ["train_samples", "test_samples", "val_samples"]:
             ds = getattr(self, sn)
-            for a in ["lengths", "indices"]:
+            for a in ["lengths", "indices", "target_masks"]:
                 v = getattr(ds, a)
                 if isinstance(v, torch.Tensor):
                     v = v.cpu()  # else numpy wont save
@@ -200,15 +214,18 @@ class LMDataModule(pl.LightningDataModule):
 
             for i in range(0, len(s), self.max_seq_len):
                 def get_chunk(lst):
+                    if None is lst:
+                        return None
                     return lst[i:i + self.max_seq_len + 1]
                     # +1 to have max_len + 1 tokens, as the first max_len are
                     # input and the last max_len are prediction
                 schunk = get_chunk(s.indices)
+                tmchunk = get_chunk(s.target_mask)
 
                 # need at least 1 token and its next token
                 # to do LM training
                 if len(schunk) > 1:
-                    res.append(TokenizedSample(schunk))
+                    res.append(TokenizedSample(schunk, target_mask=tmchunk))
         return res
 
     def print_data_desc(self, overall_list=None):
@@ -232,8 +249,10 @@ class LMDataModule(pl.LightningDataModule):
         # force_no_split_shuffle: no shuffle overrides a shuffle before the
         # dataset split, in case i ever want to add one
         n = len(samples)
-        sample_seqs = [s.seq for s in samples]
-        data = [TokenizedSample(s) for s in self.tokenizer(sample_seqs)]
+        sample_inds = self.tokenizer([s.seq for s in samples])
+        [s.target_masker.prep(self.tokenizer) for s in samples]
+        data = [TokenizedSample(inds, target_mask=s.target_masker(inds))
+                for s, inds in zip(samples, sample_inds)]
         train_n, val_n, test_n = self.decide_n_full_samples_per_set(
                                         len(samples), sizes)
 
@@ -282,22 +301,24 @@ class LMDataModule(pl.LightningDataModule):
             datasets = [getattr(self, f"{from_ds}_samples")]
         for ds in datasets:
             if i < len(ds):
-                # ds is a ForTorchDataSet, getitem returns: length, indices
-                n, indices = ds[i]
-                return n, indices[:n]
+                # ds is a ForTorchDataSet,
+                # getitem returns: length, indices, target_mask
+                n, indices, target_mask = ds[i]
+                return n, indices[:n], target_mask[:n]
             i -= len(ds)
         n = sum([len(ds) for ds in datasets])
         raise Exception(f"no sample at index {orig_i}, only have {n} " +\
                         f"samples in dataset {from_ds}")
 
     def get_sample_str(self, i=0, from_ds="all"):
-        n, indices = self.get_sample(i, from_ds=from_ds)
+        n, indices, target_mask = self.get_sample(i, from_ds=from_ds)
         return self.tokenizer.convert_ids_to_nice_string(indices)
 
     def show_sample(self, i=0):
-        n, indices = self.get_sample(i)
+        n, indices, target_mask = self.get_sample(i)
         print(f"sample {i}, has {n} tokens:")
         print(self.get_sample_str(i))
+        print("mask:", target_mask)
 
     def train_dataloader(self, batch_size, shuffle=True):
         return self.generic_loader(self.train_samples, batch_size,
@@ -321,15 +342,17 @@ class LMDataModule(pl.LightningDataModule):
 
 def mycollate(b):
     # b: list of samples. each sample is a tuple of:
-    # (int length, tensor of indices). the indices are padded with
-    # the tokenizer's pad_token_id 
+    # (int length, tensor of indices, tensor of target mask).
+    # the indices are already padded with the tokenizer's pad_token_id,
+    # but I don't easily have access to this value here for filling y
+    # with it in extra places (ie cant add y pads based on target mask here)
     dtype = torch.long
     lengths = [s[0] for s in b]
     seqlen = max(lengths)
     example_indices = b[0][1]
     device = example_indices.device
 
-    batch_indices = torch.zeros((len(b), seqlen), dtype=dtype, device=device)
+    indices = torch.zeros((len(b), seqlen), dtype=dtype, device=device)
     # nasty nasty bug i dont understand makes the assignment into values in a
     # special branch go very wrong (massive (overflow?) values in row 1, and
     # then all zeros onward) if the zeros are not moved to the expected device
@@ -340,19 +363,29 @@ def mycollate(b):
     # this solves it, and i'm tired of tracking down what it is and just want
     # to not have it
 
-    with_mask = len(set(lengths)) > 1
-    mask = torch.ones(batch_indices.shape, dtype=dtype) if with_mask else None
+    padding_mask = torch.ones(indices.shape, dtype=dtype, device=device)
+    target_mask = torch.ones(indices.shape, dtype=dtype, device=device)
+    # 0 if target on, 1 if off. currently in full indices shape for
+    # convenience, will be merged and reshaped to match y
 
-    for i, (n, seq) in enumerate(b):
-        batch_indices[i][:n] = seq[:n]
-        if with_mask:
-            mask[i][:n] = 0
-        
-    # indices shape: batch size X seq len.
-    # values past an individual sequence's length are filled with the
-    # tokenizer's pad_token_id
-    # mask shape: batch size X seq len, or None. marks pads.
-    # mask is 0 where the sequence is active and 1 where it is off (padded)
-    if None is not mask:
-        mask = mask.to(device=device)
-    return {"x_indices": batch_indices.to(device=device), "mask": mask}
+    for i, (n, inds, tmask) in enumerate(b):
+        indices[i][:n] = inds[:n]
+        padding_mask[i][:n] = 0  # 1 if padding, 0 if not
+        target_mask[i] = tmask[:seqlen]
+        # 1 if not to be trained/evaled on, 0 if yes
+
+    target_mask = torch.logical_or(target_mask, padding_mask)
+    target_mask = target_mask.to(dtype=dtype, device=device)
+    # 1 if not to be trained/evaled on, 0 if yes. full shape, ie covers x and y
+
+    x = indices[:, :-1]
+    y = indices[:, 1:]  # not contiguous, y.view(-1) won't work, only reshape
+    y = y.to(dtype=torch.long)  # cross entropy loss expects target to have
+    # type 'long' and will crash without explanation otherwise, so be safe
+    target_mask = target_mask[:, 1:]  # align with y
+    # x, y, target_mask: batch size X seq len. target_mask aligned with y
+    # in all, values past an individual sequence's length are filled with the
+    # tokenizer's pad_token_id, but other places where target should be
+    # ignored are not - have to do this where know this value
+    # mask is 0 where the target should be trained and 1 where it shouldnt
+    return {"x": x, "y": y, "target_mask": target_mask}

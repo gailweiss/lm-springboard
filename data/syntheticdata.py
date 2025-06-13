@@ -1,7 +1,7 @@
 import random
 import string
 from copy import deepcopy
-from data.support import RawSample
+from data.support import RawSample, BeforeSubSeqMasker, nomask
 
 
 class SyntheticSamplesIterator:
@@ -63,13 +63,16 @@ def registered(n=default_size, name=None):
     return _registered
 
 
+beforesemicolons = BeforeSubSeqMasker(" :: ")
+
+
 @registered()
 def histogram():
     vocab = string.ascii_lowercase + string.ascii_uppercase
     n = random.randint(10, 80)
     letters = ''.join(random.choices(vocab, k=n))
     res = [letters.count(t) for t in letters]
-    return letters + "::" + str(res)
+    return letters + " :: " + str(res)
 
 
 @registered()
@@ -88,7 +91,7 @@ def doublehistogram():
     letters = ''.join(random.choices(vocab, k=n))
     h1 = [letters.count(t) for t in letters]
     res = [h1.count(c) // c for c in h1]
-    return letters + "::" + str(res)
+    return letters + " :: " + str(res)
 
 
 @registered()
@@ -107,6 +110,19 @@ def copy():
     vocab = string.ascii_lowercase + string.ascii_uppercase + string.digits
     letters = ''.join(random.choices(vocab, k=n))
     return letters + " :: " + letters
+
+
+@registered()
+def maskedcopy():
+    n = random.randint(10, 60)
+    # 2*60 +~10 = 130 < 200 (normally my max length is 200)
+    vocab = string.ascii_lowercase + string.ascii_uppercase + string.digits
+    letters = ''.join(random.choices(vocab, k=n))
+    usemask = random.randint(0, 9) > 0  # 1 in 10 times, dont mask,
+    # so it learns to generate the random stuff before the semicolons too
+    # just so i can see what's going on when generating from nothing
+    masker = beforesemicolons if usemask else nomask
+    return RawSample(letters + " :: " + letters, target_masker=masker)
 
 
 @registered()
