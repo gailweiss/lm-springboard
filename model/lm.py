@@ -230,7 +230,7 @@ class LM(nn.Module):
 
         target_mask = batch["target_mask"]
         # 0 if on (do eval), 1 if off (ignore)
-        num_masked = target_mask.sum().item()
+        num_masked = target_mask.reshape(-1).sum().item()
         num_unmasked = target_mask.reshape(-1).shape[0] - num_masked
         # total actual length of input/output sequences
         res = torch.where(target_mask.bool(), 0, res)
