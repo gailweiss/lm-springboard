@@ -120,7 +120,7 @@ class LMDataModule(pl.LightningDataModule):
             lengths = np.load(path_join(path, f"{sn}-lengths.npy"))
             tm_path = path_join(path, f"{sn}-target_masks.npy")
             if Path(tm_path).exists():
-                target_mask = np.load(tm_path)
+                target_masks = np.load(tm_path)
             else:  # successfully load older datasets
                 target_masks = np.zeros(indices.shape)
             
