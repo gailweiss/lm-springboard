@@ -34,20 +34,32 @@ class BeforeSubSeqMasker:
         self.prepped = False
 
     def prep(self, tokenizer):
-        if self.prepped:
-            return
-        tokens = tokenizer(self.subseq)
-        if tokens[0] == tokenizer.bos():
-            tokens = tokens[1:]
-        if tokens[-1] == tokenizer.eos():
-            tokens = tokens[:-1]
-        self.subseq_toks = tokens
-        self.prepped = True
+        self.tokenizer = tokenizer
 
     def __call__(self, indices):
-        ssl = len(self.subseq_toks)
-        pos = next((i for i in range(len(indices)) if 
-                    indices[i: i + ssl] == self.subseq_toks),
-                    len(indices))  # if subseq not found, masks whole seq
-        pos = pos + ssl
-        return ([1] * pos) + ([0] * (len(indices) - pos))
+        def get_index_containing():
+            TOO_LOW, COULD_BE = 1, 2
+            def check_i(i):
+                s = self.tokenizer.convert_ids_to_nice_string(indices[:i])
+                if self.subseq not in s:
+                    return TOO_LOW
+                if self.subseq in s:
+                    return COULD_BE
+            if not indices:
+                return 0
+            if not self.subseq:  # empty subseq
+                return 0
+            lo, hi = 0, len(indices)  # now lo is always definitely too low
+            while lo < hi:
+                i = lo + max((hi - lo) // 2, 1)
+                a = check_i(i)
+                if a == TOO_LOW:
+                    lo = i
+                if a == COULD_BE:
+                    if i == (lo + 1):
+                        return i  # know that lo is too low
+                    else:
+                        hi = i
+            return len(indices)  # not found
+        len_to_contain = get_index_containing() + 1
+        return ([1] * len_to_contain) + ([0] * (len(indices) - len_to_contain))
