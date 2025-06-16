@@ -118,7 +118,12 @@ class LMDataModule(pl.LightningDataModule):
         for sn in ["train_samples", "test_samples", "val_samples"]:
             indices = np.load(path_join(path, f"{sn}-indices.npy"))
             lengths = np.load(path_join(path, f"{sn}-lengths.npy"))
-            target_masks = np.load(path_join(path, f"{sn}-target_masks.npy"))
+            tm_path = path_join(path, f"{sn}-target_masks.npy")
+            if Path(tm_path).exists():
+                target_mask = np.load(tm_path)
+            else:  # successfully load older datasets
+                target_masks = np.zeros(indices.shape)
+            
 
             # TEMPORARY until stop using old dataloaders which didnt save
             # pads correctly (anything older than 2025.01.14), and had
