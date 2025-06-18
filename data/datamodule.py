@@ -376,7 +376,9 @@ def mycollate(b):
     for i, (n, inds, tmask) in enumerate(b):
         indices[i][:n] = inds[:n]
         padding_mask[i][:n] = 0  # 1 if padding, 0 if not
-        target_mask[i] = tmask[:seqlen]
+        target_mask[i][:n] = tmask[:n]
+        # rest is already ones, ie off. using :n allows for collation even when
+        # incoming samples are not aligned in shape
         # 1 if not to be trained/evaled on, 0 if yes
 
     target_mask = torch.logical_or(target_mask, padding_mask)

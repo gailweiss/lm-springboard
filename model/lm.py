@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from data.datamodule import mycollate
 from tqdm import tqdm
 from misc.util import printer_print as print
+from data.support import RawSample, TokenizedSample
 
 
 class LM(nn.Module):
@@ -128,6 +129,48 @@ class LM(nn.Module):
         else:
             return indices
 
+    def _prepare_dl(self, dl, batch_size, shuffle):
+        # ready for dl at all manner of levels of readiness - 
+        # list of strings, list of rawsamples, list of tokenizedsamples,
+        # and just dl already (in which case cant apply requested shuffle
+        # and batch size though)
+        if not isinstance(dl, DataLoader):
+            if not dl:
+                return None
+            if isinstance(dl[0], str):
+                dl = [RawSample(s) for s in dl]
+            if isinstance(dl[0], RawSample):
+                sample_inds = self.tokenizer([s.seq for s in dl])
+                [s.target_masker.prep(self.tokenizer) for s in dl]
+                dl = [TokenizedSample(inds, target_mask=s.target_masker(inds))
+                      for s, inds in zip(dl, sample_inds)]
+            assert isinstance(dl[0], TokenizedSample)
+            dl2 = [s for s in dl if
+                   len(s) <= self.model_params.max_seq_len + 1]
+            if len(dl2) < len(dl):
+                maxlen = max(len(s) for s in dl)
+                longest = next(s for s in dl if len(s) == maxlen)
+                print(f"in prepare_dl for lm, removed {len(dl) - len(dl2)}",
+                      f"samples past max length\n",
+                      f"(had {len(dl)} samples, with max length:",
+                      f"{maxlen})")
+                print("removed sample was:",
+                      self.tokenizer.convert_ids_to_nice_string(
+                        longest.indices))
+            dl = dl2
+            device = self.device()
+            maxlen = max(len(s) for s in dl)
+            def to_mycollate_expectations(ts):
+                # (int length, tensor of indices, tensor of target mask).
+                return (len(ts),
+                        torch.Tensor(ts.indices).to(device=device).long(),
+                        torch.Tensor(ts.target_mask).to(device=device))
+            dl = DataLoader(list(map(to_mycollate_expectations, dl)),
+                            batch_size=batch_size, shuffle=shuffle,
+                            collate_fn=mycollate)
+        assert isinstance(dl, DataLoader)
+        return dl
+
     def perplexities(self, dl, batch_size=16, before_exp=False,
                      per_token=False, dummy_res=-1):
 
@@ -147,16 +190,8 @@ class LM(nn.Module):
                 return x2
             return torch.cat(tuple(pad_with_dummy(x) for x in xs))
 
-        if not isinstance(dl, DataLoader):
-            if not dl:
-                return None
-            if isinstance(dl[0], str):
-                dl = self.tokenizer(dl)
-                dl = [(len(s), torch.Tensor(s).to(device=self.device()).long())
-                      for s in dl]  # the format mycollate expects
-            dl = DataLoader(dl, batch_size=batch_size, shuffle=False,
-                            collate_fn=mycollate)
 
+        dl = self._prepare_dl(dl, batch_size, False)
         mean_ls = []
         max_l = 0
         min_l = torch.inf
