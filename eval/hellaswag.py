@@ -17,7 +17,9 @@ except Exception as e:
 # https://github.com/rowanz/hellaswag
 
 
-def get_hellaswag_subset(lm, subset="val", path=None):
+def get_hellaswag_subset(lm, subset="validation", path=None):
+    if subset == "validation":
+        subset = "val"  # hellaswag files use val not validation
     if None is path:
         for p in path_opts:
             if os.path.exists(p):
@@ -27,8 +29,10 @@ def get_hellaswag_subset(lm, subset="val", path=None):
         raise Exception("Couldn't find hellaswag data, tried:", path_opts)
     if not hasattr(lm, "hellaswag_dl_cache"):
         lm.hellaswag_dl_cache = {}
+        # prepare to cache after tokenizing etc specifically for this lm
     if subset in lm.hellaswag_dl_cache:
         return lm.hellaswag_dl_cache[subset]
+        # return cached if already tokenized specifically for this lm
     # verify using the hellaswag filenames:
     assert subset in ["train", "val", "test"], subset
     filename = f"{path}/hellaswag_{subset}.jsonl"
@@ -47,16 +51,19 @@ def get_hellaswag_subset(lm, subset="val", path=None):
     assert full_seqs[1] == (s0["ctx"] + " " + s0["endings"][1]), full_seqs[:5]
     y = torch.Tensor([s["label"] for s in qs]).long()
     return full_seqs, y, n_opts
+    # original sequences, possible answers, note on num possible answers
     
 
 @timed
-def hellaswag_eval(lm, subset="val", path=None):
+def hellaswag_eval(lm, subset="validation", path=None):
     full_seqs_or_dl, y, n_opts = get_hellaswag_subset(lm, subset=subset,
                                                       path=path)
-    pp = lm.perplexities(full_seqs_or_dl, per_token = True, dummy_res = 0)
+    pp = lm.perplexities(full_seqs_or_dl, per_token=True, dummy_res=0)
+    # pp will also provide, in "dl", the dataloader loading the tokenized seqs
     lm.hellaswag_dl_cache[subset] = (pp["dl"], y, n_opts)
-    # save time with tokenized dl from here on
+    # save time by caching and retrieving same tokenized dl from here on
     ptr = pp["per_token_res"]
     z = ptr.sum(dim=1).view(-1, n_opts).argmin(dim=1)
+    # n questions X n answers, perplexity per answer
     acc = (y == z).sum() / len(y)
     return acc.item()

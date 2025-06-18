@@ -15,6 +15,7 @@ class EvalParams:
     random_seed: int = None
     extra_tracking: bool = False
     track_hellaswag: bool = True
+    track_sepsquad: bool = False
 
 
 def make_ep(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
@@ -64,5 +65,5 @@ def make_ep(forgiving=False, takes_extras=False, convert_lists_to_tuples=False,
 #   Track some additional statistics on how training is going, in particular:
 #   weight norms, gradient norms, step norms. Will only be logged every
 #   slower_log_freq batches
-# track_hellaswag:
-#   Track hellaswag validation accuracy at all validation steps
+# track_hellaswag, track_sepsquad:
+#   Track hellaswag/sepsquad (as relevant) performance at all validation steps

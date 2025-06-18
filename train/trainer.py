@@ -4,6 +4,7 @@ import wandb
 from time import process_time
 from misc.util import printer_print as print
 from eval.hellaswag import hellaswag_eval
+from eval.sepsquad import sepsquad_eval
 
 
 class Trainer(pl.LightningModule):
@@ -136,10 +137,14 @@ class Trainer(pl.LightningModule):
         self.maybe_save_checkpoint(after_val=True)
 
     def log_other_evals(self):
+        subset = "validation"
         if self.eval_params.track_hellaswag:
-            subset = "val"
             self.log_stat(f"eval/hellaswag-{subset}",
                           hellaswag_eval(self.model, subset=subset))
+        if self.eval_params.track_sepsquad:
+            sepsquad_vals = sepsquad_eval(self.model, subset=subset)
+            for n, v in sepsquad_vals.items():
+                self.log_stat(f"eval/sepsquad-{subset}-{n}", v)
 
     def record_type_stats(self, stats, recording_dict, from_train=False,
                           stat_name="loss"):
