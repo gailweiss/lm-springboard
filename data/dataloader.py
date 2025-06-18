@@ -329,7 +329,8 @@ def assure_validation(data_params, multilingual_samples):
 
 def wikisquad(data_params):
     w = wikitextloader()  # dictionary with train, test, val
-    w = {dsn: [RawSample(s, note="wiki") for s in ds] for dsn, ds in w.items()}
+    w = {dsn: [RawSample(s, note="Source[wiki]") for s in ds]
+         for dsn, ds in w.items()}
 
     qmasker = BeforeSubSeqMasker("] A: [")
     squad_path = f"{datapath}/mysquad"
@@ -337,11 +338,13 @@ def wikisquad(data_params):
     contexts = {}
     for n in ["train", "test", "validation"]:
         with open(f"{squad_path}/{n}_contexts.txt", "r") as f:
-            contexts[n] = [RawSample(s.replace("\n",""), note="context")
+            contexts[n] = [RawSample(s.replace("\n",""),
+                                     note="Source[context]")
                            for s in f.readlines()]
     QAs = {}
     with open(f"{squad_path}/train_QAs.txt", "r") as f:
-        QAs["train"] = [RawSample(s.replace("\n",""), note="known_QA",
+        QAs["train"] = [RawSample(s.replace("\n",""),
+                                  note="Source[known_QA]",
                         target_masker=qmasker)
                         for s in f.readlines()]
     for n in ["test", "validation"]:
@@ -349,7 +352,8 @@ def wikisquad(data_params):
         for u in ["known", "unknown"]:
             # QAs on contexts that are in train (known) vs val/test (unknown)
             with open(f"{squad_path}/{n}_{u}_QAs.txt","r") as f:
-                QAs[n] += [RawSample(s.replace("\n",""), note=f"{u}_QA",
+                QAs[n] += [RawSample(s.replace("\n",""),
+                           note=f"Source[{u}_QA]",
                            target_masker=qmasker)
                            for s in f.readlines()]
 
