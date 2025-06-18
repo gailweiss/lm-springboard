@@ -1,4 +1,5 @@
 from data.syntheticdata import SyntheticSamplesIterator
+from data.support import RawSample
 from transformers import BertTokenizer, GPT2Tokenizer, AutoTokenizer, \
                          GPTNeoXTokenizerFast, XLMRobertaTokenizerFast, \
                          GPT2TokenizerFast
@@ -269,7 +270,9 @@ class MyTokenizer:
 
     @timed
     def prepare_crop(self, data):
-        # data: list of inputs, eg ["hi","i am a sample"]
+        if isinstance(data[0], RawSample):
+            data = [s.seq for s in data]
+        # now data should be: list of inputs, eg ["hi","i am a sample"]
         self.v_orig = self.vocab_size
 
         actual_used_ids = set()

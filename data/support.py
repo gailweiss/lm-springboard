@@ -21,7 +21,8 @@ class RawSample:
         self.target_masker = target_masker
 
     def __repr__(self):
-        d = {a: getattr(self, a) for a in ["seq", "lang", "note", "target_masker"]}
+        d = {a: getattr(self, a) for a in
+             ["seq", "lang", "note", "target_masker"]}
         return f"RawSample({d})"
 
 
@@ -35,6 +36,11 @@ class TokenizedSample:
 
     def __len__(self):
         return len(self.indices)
+
+    def __repr__(self):
+        d = {a: getattr(self, a) for a in
+             ["indices", "target_mask"]}
+        return f"TokenizedSample({d})"
 
 
 class BeforeSubSeqMasker:
