@@ -58,9 +58,9 @@ def get_QA_results(lm, dl_qas):
         answer_exact_matches += (answer_nmatches == answer_ntokens).tolist()
     def mean(lst):
         return sum(lst) / len(lst)
-    things = {"answer-total-loss": answer_total_losses,
-              "answer-token-accs": answer_token_accs,
-              "answer-exact-matches": answer_exact_matches}
+    things = {"total-loss": answer_total_losses,
+              "token-accs": answer_token_accs,
+              "exact-matches": answer_exact_matches}
     return {k: mean(v) for k, v in things.items()}
 
 
