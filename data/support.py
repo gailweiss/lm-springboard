@@ -6,7 +6,7 @@ class NoMask:
     def prep(self, tokenizer):
         pass
     def __call__(self, indices):
-        return None
+        return [0] * len(indices)
     def __repr__(self):
         return "nomask"
 
