@@ -19,7 +19,7 @@ def make_datamodule(data_params, model_params, verbose=True,
     # 1. need the dataset as it may influence the tokenizer, e.g. if
     # cropping from a loaded huggingface tokenizer, or making a char-
     # level tokenizer
-    plain_data, lang_counters, encoding_error_counts = get_data(data_params)
+    plain_data, lang_counters = get_data(data_params)
 
     def as_iterable(d):
         if isinstance(d, list) or isinstance(d, SyntheticSamplesIterator):
@@ -46,8 +46,7 @@ def make_datamodule(data_params, model_params, verbose=True,
     # 3. make a data module, with the tokenizer.
     # this one does take the true data, to maintain the train/val/test split
     dataset = LMDataModule(plain_data, tokenizer, data_params, model_params,
-                           verbose_init=verbose, lang_counters=lang_counters,
-                           encoding_error_counts=encoding_error_counts)
+                           verbose_init=verbose, lang_counters=lang_counters)
 
     if keep_datamodule:
         # stores in first (i.e., default) datamodules path
