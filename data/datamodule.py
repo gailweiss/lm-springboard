@@ -52,7 +52,7 @@ class ForTorchDataSet:
 class LMDataModule(pl.LightningDataModule):
     def __init__(self, data, tokenizer, data_params, model_params,
                  verbose_init=False, from_folder=None, skeleton_load=False,
-                 lang_counters=None):
+                 lang_counters=None, encoding_error_counts=None):
         super().__init__()
         self.skeleton_load = skeleton_load
         self.from_path = None
@@ -60,6 +60,7 @@ class LMDataModule(pl.LightningDataModule):
         self.lang_fullsample_counts = lang_counters  # doesnt tell you which
         # sample is which lang, but at least tells you how many there are.
         # note: counts *full* samples - ie before chunking for the max seq len
+        self.encoding_error_counts = encoding_error_counts
         if None is not from_folder:
             self.setup_from_folder(from_folder)
         else:
@@ -163,7 +164,8 @@ class LMDataModule(pl.LightningDataModule):
         self.from_path = path
         self.tokenizer.save(path)
         base_attr_names = ["train_n", "test_n", "val_n",
-                           "lang_fullsample_counts", "tokenizer_size"]
+                           "lang_fullsample_counts", "tokenizer_size",
+                           "encoding_error_counts"]
         notes = {n: getattr(self, n) for n in base_attr_names}
         with open(path_join(path, f"dataloader_notes.json"), "w") as f:
             json.dump(notes, f)

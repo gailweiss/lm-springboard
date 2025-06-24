@@ -5,6 +5,7 @@ from misc.util import printer_print as print
 from tqdm import tqdm
 from collections import Counter
 from data.support import RawSample, BeforeSubSeqMasker
+import codecs
 
 
 try:
@@ -29,6 +30,7 @@ def get_local_datafolder(n):
 
 def get_data(data_params):
     lang_counters = None
+    ee_counts = None
     if data_params.dataset_name == "dummy":
         samples = verysimplesamplesreader("data", data_params)
     elif data_params.dataset_name == "wikitext":
@@ -40,7 +42,7 @@ def get_data(data_params):
     elif data_params.dataset_name.startswith("c4-"):  # eg c4-en 
         samples = c4loader(data_params)
     elif data_params.dataset_name in ["fineweb-ml", "wiki40b"]:
-        samples, lang_counters = multiloader(data_params)
+        samples, lang_counters, ee_counts = multiloader(data_params)
     elif data_params.dataset_name == "wikisquad":
         samples = wikisquad(data_params)
         # not affected by test/val pct - predetermined
@@ -76,7 +78,7 @@ def get_data(data_params):
             assert isinstance(dl, list), dn
             if isinstance(dl[0], str):
                 samples[dn] = [RawSample(s) for s in dl]
-    return samples, lang_counters
+    return samples, lang_counters, ee_counts
 
 
 def ptbloader():
@@ -153,9 +155,33 @@ def verysimplesamplesreader(path, data_params):
     return all_samples
 
 
+class ErrorsCounter:
+    def __init__(self):
+        self.c = 0
+    def increment(self):
+        self.c += 1
+    def reset(self):
+        self.c = 0
+
+ec = ErrorsCounter()
+
+def fix_utf8(s):
+    try:
+        # If it's a str with escape sequences like \xD0
+        if '\\x' in s:
+            s = codecs.decode(s, 'unicode_escape')
+        return s.encode('latin1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError) as e:
+        print("had unicode error:\n", e)
+        print("string was:", s)
+        ec.increment()
+        return s
+
+
 class MultiLingualLoader:
     def __init__(self, base, langs):
         assert base in ["fineweb-ml", "wiki40b"]
+        self.iswiki40b = base == "wiki40b"
         self.datasets = {}
         self.langs = langs
         for lang in self.langs:
@@ -208,7 +234,10 @@ class MultiLingualLoader:
 
     def get_next_sample_small(self, split, fallback="train"):
         s = self.get_next_sample_full(split, fallback=fallback)
-        return (s["text"], f"Lang[{s['language']}]")
+        txt = s["text"]
+        if self.iswiki40b:
+            txt = fix_utf8(txt)
+        return (txt, f"Lang[{s['language']}]")
         # fineweb "en" samples can also give s["token_count"], the number of
         # tokens they would use in gpt2. but this is not present in the
         # fineweb2 samples, so avoiding here
@@ -233,13 +262,15 @@ def multiloader(data_params):
     print("working with data_params:", data_params)
     print("so want to get train/val/test amounts:", fullnumbers)
     res = {}
+    encoding_error_counts = {}
     print(f"loading {data_params.dataset_name} samples - train, val, test")
-    res["train"] = [d.get_next_sample_small("train") for _ in
-                    tqdm(range(n_train_fullsamples))]
-    res["validation"] = [d.get_next_sample_small("validation") for _ in
-                         tqdm(range(n_val_fullsamples))]
-    res["test"] = [d.get_next_sample_small("test") for _ in
-                   tqdm(range(n_test_fullsamples))]
+    for dsn, n in [("train", n_train_fullsamples),
+                   ("validation", n_val_fullsamples),
+                   ("test", n_test_fullsamples)]:
+        ec.reset()
+        res[dsn] = [d.get_next_sample_small(dsn) for _ in tqdm(range(n))]
+        print(f"had encoding fix issues on {ec.c} samples out of {n}")
+        encoding_error_counts[dsn] = ec.c
 
     def print_sample_counts(relation):
         actual_nums = {n: len(res[n]) for n in res}
@@ -258,7 +289,8 @@ def multiloader(data_params):
     for dataset_name in res:
         res[dataset_name] = [RawSample(s[0], lang=s[1]) for
                              s in res[dataset_name]]
-    return res, final_lang_counters
+
+    return res, final_lang_counters, encoding_error_counts
 
 
 def assure_validation(data_params, multilingual_samples):
