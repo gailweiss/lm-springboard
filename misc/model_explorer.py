@@ -174,7 +174,7 @@ def refine_model_ids_choice(all_ids, subfolder_substr=None,
 
 
 def all_identifiers_with_configs(kws, min_date=None, max_date=None,
-        verbose=False, matching_datamodule_id=None):
+        verbose=False, matching_datamodule_id=None, in_subfolder=None):
     # kws: nested dict of configs.
     # level one: data_params, train_params, model_params
     # level two: each config that is being specified in this request,
@@ -191,11 +191,16 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None,
         dataset_names = [dataset_names]
     if not dataset_names:
         dataset_names = list(identifiers_dict.keys())
-    res = itertools.chain.from_iterable(
+    potentials = itertools.chain.from_iterable(
         [identifiers_dict[dn] for dn in dataset_names])
 
-    res = [i for i, path in res if date_in_range(i, min_date, max_date)]
+    potentials = [(i, path) for i, path in potentials if
+                  date_in_range(i, min_date, max_date)]
+    if None is not in_subfolder:
+        potentials = [(i, path) for i, path in potentials if
+                      f"saved-models/{in_subfolder}" in path]
 
+    res = [i for i, path in potentials]  # move to just identifiers
     def get_param(identifier, paramset_name, param_name):
         info = get_info(identifier, verbose=verbose)
         if None is info:
