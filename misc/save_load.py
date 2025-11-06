@@ -61,8 +61,8 @@ def get_train_stats(folder_name, get_lite=True, store_lite=True,
                     batch_size=None):
     # need batch_size so long as still fixing older runs, eventually remove it
     def is_lite_key(k):
-        for n in ["||max/", "||min/"]:
-            if n in k:
+        if "_loss||" in k:
+            if "||mean/" not in k:
                 return False
         for n in ["-max", "-min"]:
             if k.endswith(n):
