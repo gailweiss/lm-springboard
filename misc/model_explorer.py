@@ -76,7 +76,7 @@ def is_identifier(seq):
     return is_timestamp(seq)
 
 
-def auto_identifiers():
+def auto_identifiers(in_subfolder=None):
     def task_name(path):
         try:
             with open(path_join(path, final_chkpt, "data_params.json"),
@@ -97,6 +97,9 @@ def auto_identifiers():
     for p in models_paths:
         all_paths += glob_nosquares(f"{p}/**", recursive=True)
     all_paths = [p for p in all_paths if last_is_identifier(p)]
+    if None is not in_subfolder:
+        all_paths = [p for p in all_paths if
+                     f"saved-models/{in_subfolder}" in p]
     all_tuples = [(task_name(p), last_folder(p), p) for p in all_paths]
     res = {}
     for tn, identifier, p in all_tuples:
@@ -185,7 +188,7 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None,
     # lists in the config files are treated as lists of values to run
     # rather than a single value (that is a list) for that parameter
     # min_date/max_date example format: "2024-10-17--00-00-00"
-    identifiers_dict = auto_identifiers()
+    identifiers_dict = auto_identifiers(in_subfolder)
     dataset_names = kws.get("data_params", {}).get("dataset_name", [])
     if not isinstance(dataset_names, list):
         dataset_names = [dataset_names]
@@ -202,7 +205,7 @@ def all_identifiers_with_configs(kws, min_date=None, max_date=None,
 
     res = [i for i, path in potentials]  # move to just identifiers
     def get_param(identifier, paramset_name, param_name):
-        info = get_info(identifier, verbose=verbose)
+        info = get_info(identifier, verbose=verbose, in_subfolder=in_subfolder)
         if None is info:
             return []
         if None is info["params"][paramset_name]:
@@ -243,27 +246,33 @@ def would_load_datamodule(m_id, d_id):
     return identifier == d_id
 
 
-def ids_with_missing_paramsets(identifiers, verbose=False):
-    res = set([i for i in identifiers if None in get_info(i).values()])
+def ids_with_missing_paramsets(identifiers, verbose=False, in_subfolder=None):
+    infos = {i: get_info(i, in_subfolder=in_subfolder) for i in identifiers}
+    res = set([i for i in identifiers if None in infos[i].values()])
     if res and verbose:
         print("following ids have a missing paramset:", file=file)
         for i in sorted(list(res)):
-            missing_sets = [psn for psn in get_info(i) if
-                            None is get_info(i)[psn]]
-            print(f"\n{i}, missing: {missing_sets}. path: {get_full_path(i)}",
+            missing_sets = [psn for psn in infos[i] if None is infos[i][psn]]
+            print(f"\n{i}, missing: {missing_sets}.",
+                  f"path: {get_full_path(i, in_subfolder=in_subfolder)}",
                   file=file)
         print("==\n\n", file=file)
     return res
 
 
-def get_configs_values(identifiers, verbose=False):
-    if ids_with_missing_paramsets(identifiers, verbose=verbose):
+def get_configs_values(identifiers, verbose=False, in_subfolder=None):
+    if not identifiers:
+        print("no identifiers given?")
+        return -1
+    if ids_with_missing_paramsets(identifiers, verbose=verbose,
+                                  in_subfolder=in_subfolder):
         return -1
 
     def params_dicts(model_info):
         return {k: vars(v) for k, v in model_info["params"].items()}
 
-    infos = [(i, params_dicts(get_info(i))) for i in identifiers]
+    infos = [(i, params_dicts(get_info(i, in_subfolder=in_subfolder)))
+             for i in identifiers]
 
     # check all infos have same structure before reaching weird conclusions
     example_id, example_info = infos[0]
@@ -282,9 +291,9 @@ def get_configs_values(identifiers, verbose=False):
 
 
 def print_config_compare(identifiers, print_padding=30, file=sys.stdout,
-                         just_list_differing_keys=False):
-    
-    all_vals = get_configs_values(identifiers, verbose=True)
+                         just_list_differing_keys=False, in_subfolder=None):
+    all_vals = get_configs_values(identifiers, verbose=True,
+                                  in_subfolder=in_subfolder)
     if not isinstance(all_vals, dict):
         print("could not get config value sets for these identifiers")
         return all_vals
@@ -447,12 +456,14 @@ info_cache = {}
 
 
 def get_info(identifier, with_train_stats=False, verbose=True,
-             dont_cache=False, get_lite=True, store_lite=True):
+             dont_cache=False, get_lite=True, store_lite=True,
+             in_subfolder=None):
     # always caches, info is generally small
-    cache_id = (identifier, with_train_stats, get_lite, store_lite)
+    cache_id = (in_subfolder, identifier, with_train_stats,
+                get_lite, store_lite)
     if cache_id not in info_cache:
         path = get_full_path(identifier, checkpoint=final_chkpt,
-                             verbose=verbose)
+                             verbose=verbose, in_subfolder=in_subfolder)
         if None is path:
             if verbose:
                 print("could not get final checkpoint path for identifier:",
@@ -534,12 +545,15 @@ def check_validation(loaded_model):
 
 
 
-def get_full_path(identifier, checkpoint=final_chkpt, verbose=True):
+def get_full_path(identifier, checkpoint=final_chkpt, verbose=True,
+                  in_subfolder=None):
     paths = []
     for p in models_paths:
         paths += glob_nosquares(f"{p}/**/", recursive=True)
     paths = [p for p in paths if
              (f"/{identifier}/" in p and p.endswith(f"/{checkpoint}/"))]
+    if None is not in_subfolder:
+        paths = [p for p in paths if f"saved-models/{in_subfolder}" in p]
     if len(paths) == 1:
         return paths[0]
     if len(paths) < 1:
@@ -548,8 +562,9 @@ def get_full_path(identifier, checkpoint=final_chkpt, verbose=True):
         return None
     if len(paths) > 1:
         if verbose:
-            print("found multiple model folders with:", identifier, checkpoint)
-            print("\n", "\n".join(paths))
+            print("\nfound multiple model folders with request:",
+                  identifier, checkpoint, in_subfolder)
+            print("\n".join(paths))
         return None
 
 
